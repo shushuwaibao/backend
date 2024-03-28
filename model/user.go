@@ -9,17 +9,32 @@ import (
 // User if you add sensitive fields, don't forget to clean them in setupLogin function.
 // Otherwise, the sensitive information will be saved on local storage in plain text!
 type User struct {
-	Id               int    `json:"id"`
-	Username         string `json:"username" gorm:"unique;index" validate:"max=12"`
-	Password         string `json:"password" gorm:"not null;" validate:"min=8,max=20"`
-	DisplayName      string `json:"display_name" gorm:"index" validate:"max=20"`
-	Role             int    `json:"role" gorm:"type:int;default:1"`   // admin, common
-	Status           int    `json:"status" gorm:"type:int;default:1"` // enabled, disabled
-	Token            string `json:"token" gorm:"index"`
-	Email            string `json:"email" gorm:"index" validate:"max=50"`
-	GitHubId         string `json:"github_id" gorm:"column:github_id;index"`
-	WeChatId         string `json:"wechat_id" gorm:"column:wechat_id;index"`
-	VerificationCode string `json:"verification_code" gorm:"-:all"` // this field is only for Email verification, don't save it to database!
+	Id               int            `json:"id"`
+	Username         string         `json:"username" gorm:"unique;index" validate:"max=12"`
+	Password         string         `json:"password" gorm:"not null;" validate:"min=8,max=20"`
+	DisplayName      string         `json:"display_name" gorm:"index" validate:"max=20"`
+	Role             int            `json:"role" gorm:"type:int;default:1"`   // admin, common
+	Status           int            `json:"status" gorm:"type:int;default:1"` // enabled, disabled
+	Token            string         `json:"token" gorm:"index"`
+	Email            string         `json:"email" gorm:"index" validate:"max=50"`
+	GitHubId         string         `json:"github_id" gorm:"column:github_id;index"`
+	WeChatId         string         `json:"wechat_id" gorm:"column:wechat_id;index"`
+	VerificationCode string         `json:"verification_code" gorm:"-:all"` // this field is only for Email verification, don't save it to database!
+	Organizations    []Organization `json:"organizations" gorm:"many2many:user_organization_relations;"`
+}
+
+type Organization struct {
+	Id          int    `json:"id"`
+	Name        string `json:"name" gorm:"unique;size:255;not null"`
+	Description string `json:"description" gorm:"type:text"`
+	// CreatedAt      time.Time `gorm:"not null"`
+	Users []User `json:"users" gorm:"many2many:user_organization_relations;"`
+}
+
+type UserOrganizationRelation struct {
+	UserID         string `gorm:"primaryKey;type:char(36)"`
+	OrganizationID string `gorm:"primaryKey;type:char(36)"`
+	Permission     int    `gorm:"type:int;default:1"` // 1: member, 0: admin
 }
 
 func GetMaxUserId() int {

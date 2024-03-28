@@ -37,6 +37,19 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.GET("/token", controller.GenerateToken)
 			}
 
+			manageRoute := userRoute.Group("/manage")
+			manageRoute.Use() //dev, no auth
+			// manageRoute.Use(middleware.UserAuth(), middleware.NoTokenAuth())
+			{
+				manageRoute.GET("/getconfs", controller.GetAllAvailableInstanceConfig)
+				manageRoute.POST("/create", controller.CreateInstanceConfig)
+				manageRoute.POST("/start", controller.StartInstanceByInstanceID)
+				manageRoute.POST("/stop", controller.StopInstanceByInstanceID)
+				manageRoute.POST("/remove", controller.RemoveInstancerByInstanceID)
+				manageRoute.POST("/export", controller.ExportInstanceImage)
+				manageRoute.POST("/edit", controller.EditInstanceConfig)
+			}
+
 			adminRoute := userRoute.Group("/")
 			adminRoute.Use(middleware.AdminAuth(), middleware.NoTokenAuth())
 			{

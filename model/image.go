@@ -1,0 +1,38 @@
+package model
+
+import (
+	"gorm.io/gorm"
+)
+
+// ImageConfig represents the model for an image configuration in the database.
+type ImageConfig struct {
+	ID           int     `gorm:"primaryKey" json:"id"`
+	Nickname     string  `gorm:"size:255" json:"nickname"`
+	Name         string  `gorm:"size:255" json:"name"`
+	Version      string  `gorm:"size:255" json:"version"`
+	Description  string  `gorm:"type:text" json:"description"`
+	Size         float64 `gorm:"type:float" json:"size"`
+	BelongsToWho string  `gorm:"size:255" json:"belongsToWho"` // "user" or "organization"
+	BelongsTo    int     `gorm:"type:int" json:"belongsTo"`    // user id or organization id
+	Permission   string  `gorm:"size:255" json:"permission"`   // "0": public, "1": private
+}
+
+// ListAvailableImages lists images based on permission.
+// It selects public images and private images that belong to the specified user or organization.
+func ListAvailableImages(db *gorm.DB, belongsToWho string, belongsToId int) ([]ImageConfig, error) {
+	var images []ImageConfig
+
+	// Build the query to select images that are public or belong to the specified entity.
+	query := db.Where("permission = ?", "0") // Public images
+	if belongsToWho == "user" || belongsToWho == "organization" {
+		// Add condition to include private images belonging to the user or organization
+		query = query.Or("(belongs_to_who = ? AND belongs_to = ? AND permission = ?)", belongsToWho, belongsToId, "1")
+	}
+
+	// Execute the query
+	if err := query.Find(&images).Error; err != nil {
+		return nil, err // Handle error, e.g., return it
+	}
+
+	return images, nil
+}
