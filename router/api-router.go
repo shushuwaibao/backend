@@ -42,7 +42,7 @@ func SetApiRouter(router *gin.Engine) {
 			// manageRoute.Use(middleware.UserAuth(), middleware.NoTokenAuth())
 			{
 				manageRoute.GET("/getconfs", controller.GetAllAvailableInstanceConfig)
-				manageRoute.POST("/create", controller.CreateInstanceConfig)
+				manageRoute.POST("/create", controller.CreateInstanceConfigAndStart)
 				manageRoute.POST("/start", controller.StartInstanceByInstanceID)
 				manageRoute.POST("/stop", controller.StopInstanceByInstanceID)
 				manageRoute.POST("/remove", controller.RemoveInstancerByInstanceID)

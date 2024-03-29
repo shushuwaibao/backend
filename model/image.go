@@ -9,6 +9,7 @@ type ImageConfig struct {
 	ID           int     `gorm:"primaryKey" json:"id"`
 	Nickname     string  `gorm:"size:255" json:"nickname"`
 	Name         string  `gorm:"size:255" json:"name"`
+	Registry     string  `gorm:"size:255" json:"registry"`
 	Version      string  `gorm:"size:255" json:"version"`
 	Description  string  `gorm:"type:text" json:"description"`
 	Size         float64 `gorm:"type:float" json:"size"`

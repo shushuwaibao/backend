@@ -7,9 +7,22 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var DB *gorm.DB
+var Kube_Config *rest.Config
+
+func InitKubeConfig() {
+	kubeconfig := os.Getenv("KUBE_CONFIG")
+	tempconfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+
+	if err != nil {
+		common.FatalLog(err)
+	}
+	Kube_Config = tempconfig
+}
 
 func createRootAccountIfNeed() error {
 	var user User

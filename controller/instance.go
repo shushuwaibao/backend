@@ -19,7 +19,7 @@ func RemoveInstancerByInstanceID(c *gin.Context) {
 
 }
 
-func CreateInstanceConfig(c *gin.Context) {
+func CreateInstanceConfigAndStart(c *gin.Context) {
 
 }
 

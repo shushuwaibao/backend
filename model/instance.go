@@ -1,9 +1,19 @@
 package model
 
-import "time"
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+)
 
 type UserContainer struct {
-	ID           int64     `gorm:"primaryKey" json:"id"`
+	ID           int       `gorm:"primaryKey" json:"id"`
 	Label        string    `gorm:"size:255" json:"label"`
 	Namespace    string    `gorm:"type:char(36)" json:"namespace"`
 	ConfigID     string    `gorm:"type:char(36)" json:"configId"`
@@ -38,32 +48,137 @@ type ContainerConfig struct {
 	Price       float64 `gorm:"type:float" json:"price"`
 }
 
-func GetUserContainerByID(id int64) (*UserContainer, error) {
+type InstanceConfig struct {
+	ID              int
+	Label           string
+	Namespace       string
+	ConfigID        string
+	UserID          string
+	ImageID         string
+	CreatedAt       time.Time
+	TotalRuntime    int
+	LastBoot        time.Time
+	StartCMD        string
+	Status          string
+	Envs            string
+	Service         string
+	AttachedStorage []StorageInfo // Assuming this field represents the joined data from another table.
+	CPUConf         int           // Assuming you might also want the config details like CPU, Memory etc.
+	MemoryConf      int
+	GPUConf         int
+	ImageConfig     ImageConfig // Assuming you want details about the image used.
+}
+
+func GetUserContainerByID(id int) (*UserContainer, error) {
 	var container UserContainer
 	err := DB.First(&container, id).Error
 	return &container, err
 }
 
-func GetALLUserContainerByUSERID(userID string) ([]UserContainer, error) {
+func GetALLUserContainerByUserID(userID string) ([]UserContainer, error) {
 	var containers []UserContainer
 	err := DB.Where("user_id = ?", userID).Find(&containers).Error
 	return containers, err
 }
 
-func GetInstanceConfigByContainerID(id int) (*ContainerConfig, error) {
-	var config ContainerConfig
-	// get config id
-	var container UserContainer
-	err := DB.First(&container, id).Error
+func GetInstanceConfigByInstanceID(id int64) (*InstanceConfig, error) {
+	var instanceConfig InstanceConfig
+	err := DB.Table("user_containers").
+		Select("user_containers.*, container_configs.cpu_conf, container_configs.memory_conf, container_configs.gpu_conf, image_configs.*").
+		Joins("left join storage_infos on storage_infos.container_id = user_containers.id").
+		Joins("left join container_configs on container_configs.config_id = user_containers.config_id").
+		Joins("left join image_configs on image_configs.id = user_containers.image_id").
+		Where("user_containers.id = ?", id).
+		Scan(&instanceConfig).Error
+
 	if err != nil {
 		return nil, err
 	}
-	err = DB.First(&config, container.ConfigID).Error
-	return &config, err
+
+	// Assuming multiple storages can be attached, find and assign them separately
+	var attachedStorages []StorageInfo
+	err = DB.Where("container_id = ?", id).Find(&attachedStorages).Error
+	if err != nil {
+		return nil, err
+	}
+	instanceConfig.AttachedStorage = attachedStorages
+
+	return &instanceConfig, nil
 }
 
 func GetAvailableInstanceConfig() ([]ContainerConfig, error) {
 	var configs []ContainerConfig
 	err := DB.Find(&configs).Error
 	return configs, err
+}
+
+func CreatePodFromInstanceConfig(instanceConfig *InstanceConfig) (*corev1.Pod, error) {
+	// 创建Kubernetes客户端
+	clientset, err := kubernetes.NewForConfig(Kube_Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	var envVars []corev1.EnvVar
+	if instanceConfig.Envs != "" {
+		err := json.Unmarshal([]byte(instanceConfig.Envs), &envVars)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal environment variables: %w", err)
+		}
+	}
+	var volumeMounts []corev1.VolumeMount
+	var volumes []corev1.Volume
+
+	for _, storage := range instanceConfig.AttachedStorage {
+		volumeName := fmt.Sprintf("storage-%d", storage.ID) // 使用存储的ID作为卷的名称
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      volumeName,
+			MountPath: storage.Path, // 使用StorageInfo中定义的挂载路径
+		})
+		volumes = append(volumes, corev1.Volume{
+			Name: volumeName,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: fmt.Sprintf("pvc-%d", storage.ID), // 假设PVC的命名规则为"pvc-"加上存储的ID
+				},
+			},
+		})
+	}
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "a" + fmt.Sprint(instanceConfig.ID), // 假设pod名称为"a"加上instance ID
+			Namespace: instanceConfig.Namespace,
+			Labels:    map[string]string{"app": "instance"},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:    instanceConfig.Label,
+					Image:   instanceConfig.ImageConfig.Name, // 假设ImageConfig.Name包含了完整的镜像地址
+					Command: []string{"/bin/sh", "-c", instanceConfig.StartCMD},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%dm", instanceConfig.CPUConf)),
+							corev1.ResourceMemory: resource.MustParse(fmt.Sprintf("%dMi", instanceConfig.MemoryConf)),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%dm", instanceConfig.CPUConf*2)), // 假设limit是request的两倍
+							corev1.ResourceMemory: resource.MustParse(fmt.Sprintf("%dMi", instanceConfig.MemoryConf*2)),
+						},
+					},
+					Env:          envVars,
+					VolumeMounts: volumeMounts,
+				},
+			},
+			Volumes: volumes,
+		},
+	}
+	// 创建Pod
+	pod, err = clientset.CoreV1().Pods(instanceConfig.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pod: %w", err)
+	}
+
+	return pod, nil
 }
