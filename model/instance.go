@@ -1,15 +1,12 @@
 package model
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
+	k8s "gin-template/model/kubernetes"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	appsv1 "k8s.io/api/apps/v1"
+	apiv1 "k8s.io/api/core/v1"
 )
 
 type UserContainer struct {
@@ -112,73 +109,117 @@ func GetAvailableInstanceConfig() ([]ContainerConfig, error) {
 	return configs, err
 }
 
-func CreatePodFromInstanceConfig(instanceConfig *InstanceConfig) (*corev1.Pod, error) {
-	// 创建Kubernetes客户端
-	clientset, err := kubernetes.NewForConfig(Kube_Config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
-	}
+func NewStatefulSetAndService(instanceConfig *InstanceConfig) (*appsv1.StatefulSet, *apiv1.Service) {
+	name := fmt.Sprint("a", instanceConfig.ID)
+	metadata := k8s.CreateStatefulSetMetadata(name, instanceConfig.Namespace)
+	selector := CreateSelector()
+	containers := createContainers(name, img_url, memReq, memLim)
+	pvc := createPVC(name, PVCMem)
+	servicePorts := createServicePorts()
+	serviceSelector := createServiceSelector(name)
 
-	var envVars []corev1.EnvVar
-	if instanceConfig.Envs != "" {
-		err := json.Unmarshal([]byte(instanceConfig.Envs), &envVars)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal environment variables: %w", err)
-		}
-	}
-	var volumeMounts []corev1.VolumeMount
-	var volumes []corev1.Volume
-
-	for _, storage := range instanceConfig.AttachedStorage {
-		volumeName := fmt.Sprintf("storage-%d", storage.ID) // 使用存储的ID作为卷的名称
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      volumeName,
-			MountPath: storage.Path, // 使用StorageInfo中定义的挂载路径
-		})
-		volumes = append(volumes, corev1.Volume{
-			Name: volumeName,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: fmt.Sprintf("pvc-%d", storage.ID), // 假设PVC的命名规则为"pvc-"加上存储的ID
-				},
-			},
-		})
-	}
-
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "a" + fmt.Sprint(instanceConfig.ID), // 假设pod名称为"a"加上instance ID
-			Namespace: instanceConfig.Namespace,
-			Labels:    map[string]string{"app": "instance"},
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:    instanceConfig.Label,
-					Image:   instanceConfig.ImageConfig.Name, // 假设ImageConfig.Name包含了完整的镜像地址
-					Command: []string{"/bin/sh", "-c", instanceConfig.StartCMD},
-					Resources: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%dm", instanceConfig.CPUConf)),
-							corev1.ResourceMemory: resource.MustParse(fmt.Sprintf("%dMi", instanceConfig.MemoryConf)),
-						},
-						Limits: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%dm", instanceConfig.CPUConf*2)), // 假设limit是request的两倍
-							corev1.ResourceMemory: resource.MustParse(fmt.Sprintf("%dMi", instanceConfig.MemoryConf*2)),
-						},
+	// 使用上面的子函数来构建 StatefulSet 和 Service
+	ss := &appsv1.StatefulSet{
+		ObjectMeta: metadata,
+		Spec: appsv1.StatefulSetSpec{
+			ServiceName: name,
+			Replicas:    k8s.Int32Ptr(1),
+			Selector:    selector,
+			Template: apiv1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": "desktop",
 					},
-					Env:          envVars,
-					VolumeMounts: volumeMounts,
+				},
+				Spec: apiv1.PodSpec{
+					Containers: containers,
 				},
 			},
-			Volumes: volumes,
+			VolumeClaimTemplates: []apiv1.PersistentVolumeClaim{pvc},
 		},
 	}
-	// 创建Pod
-	pod, err = clientset.CoreV1().Pods(instanceConfig.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create pod: %w", err)
+
+	svc := &apiv1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: apiv1.ServiceSpec{
+			Type:     apiv1.ServiceTypeNodePort,
+			Ports:    servicePorts,
+			Selector: serviceSelector,
+		},
 	}
 
-	return pod, nil
+	return ss, svc
 }
+
+// func CreatePodFromInstanceConfig(instanceConfig *InstanceConfig) (*corev1.Pod, error) {
+// 	// 创建Kubernetes客户端
+// 	clientset, err := kubernetes.NewForConfig(Kube_Config)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
+// 	}
+
+// 	var envVars []corev1.EnvVar
+// 	if instanceConfig.Envs != "" {
+// 		err := json.Unmarshal([]byte(instanceConfig.Envs), &envVars)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("failed to unmarshal environment variables: %w", err)
+// 		}
+// 	}
+// 	var volumeMounts []corev1.VolumeMount
+// 	var volumes []corev1.Volume
+
+// 	for _, storage := range instanceConfig.AttachedStorage {
+// 		volumeName := fmt.Sprintf("storage-%d", storage.ID) // 使用存储的ID作为卷的名称
+// 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+// 			Name:      volumeName,
+// 			MountPath: storage.Path, // 使用StorageInfo中定义的挂载路径
+// 		})
+// 		volumes = append(volumes, corev1.Volume{
+// 			Name: volumeName,
+// 			VolumeSource: corev1.VolumeSource{
+// 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+// 					ClaimName: fmt.Sprintf("pvc-%d", storage.ID), // 假设PVC的命名规则为"pvc-"加上存储的ID
+// 				},
+// 			},
+// 		})
+// 	}
+
+// 	pod := &corev1.Pod{
+// 		ObjectMeta: metav1.ObjectMeta{
+// 			Name:      "a" + fmt.Sprint(instanceConfig.ID), // 假设pod名称为"a"加上instance ID
+// 			Namespace: instanceConfig.Namespace,
+// 			Labels:    map[string]string{"app": "instance"},
+// 		},
+// 		Spec: corev1.PodSpec{
+// 			Containers: []corev1.Container{
+// 				{
+// 					Name:    instanceConfig.Label,
+// 					Image:   instanceConfig.ImageConfig.Name, // 假设ImageConfig.Name包含了完整的镜像地址
+// 					Command: []string{"/bin/sh", "-c", instanceConfig.StartCMD},
+// 					Resources: corev1.ResourceRequirements{
+// 						Requests: corev1.ResourceList{
+// 							corev1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%dm", instanceConfig.CPUConf)),
+// 							corev1.ResourceMemory: resource.MustParse(fmt.Sprintf("%dMi", instanceConfig.MemoryConf)),
+// 						},
+// 						Limits: corev1.ResourceList{
+// 							corev1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%dm", instanceConfig.CPUConf*2)), // 假设limit是request的两倍
+// 							corev1.ResourceMemory: resource.MustParse(fmt.Sprintf("%dMi", instanceConfig.MemoryConf*2)),
+// 						},
+// 					},
+// 					Env:          envVars,
+// 					VolumeMounts: volumeMounts,
+// 				},
+// 			},
+// 			Volumes: volumes,
+// 		},
+// 	}
+// 	// 创建Pod
+// 	pod, err = clientset.CoreV1().Pods(instanceConfig.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to create pod: %w", err)
+// 	}
+
+// 	return pod, nil
+// }
