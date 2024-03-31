@@ -4,9 +4,6 @@ import (
 	"fmt"
 	k8s "gin-template/model/kubernetes"
 	"time"
-
-	appsv1 "k8s.io/api/apps/v1"
-	apiv1 "k8s.io/api/core/v1"
 )
 
 type UserContainer struct {
@@ -146,42 +143,8 @@ func GetAvailableInstanceConfig() ([]ContainerConfig, error) {
 	return configs, err
 }
 
-
-
-func NewStatefulSetAndService(instanceConfig *InstanceConfig) (*appsv1.StatefulSet, *apiv1.Service) {
-	name := fmt.Sprint("rdp_desktop", instanceConfig.ID)
-	metadata := k8s.GetStatefulSetMetadata(name, instanceConfig.Namespace)
-	label := k8s.GenerateLabel(name)
-
-	selector := k8s.GetPodSelector(label)
-	var containers []apiv1.Container
-	PodConf := instanceConfigToPodInfo(instanceConfig)
-	containers = append(containers, k8s.GetContainer(PodConf))
-	// pvc := k8s.GetPVC(PodConf)
-	ss := &appsv1.StatefulSet{
-		ObjectMeta: metadata,
-		Spec: appsv1.StatefulSetSpec{
-			ServiceName: name,
-			Replicas:    k8s.Int32Ptr(1),
-			Selector:    &selector,
-			Template: apiv1.PodTemplateSpec{
-				ObjectMeta: k8s.GetPodTemplateMetadata(label),
-				Spec: apiv1.PodSpec{
-					Containers: containers,
-				},
-			},
-			VolumeClaimTemplates: k8s.GetPVC(PodConf),
-		},
-	}
-
-	svc := &apiv1.Service{
-		ObjectMeta: metadata,
-		Spec: apiv1.ServiceSpec{
-			Type:     apiv1.ServiceTypeNodePort,
-			Ports:    k8s.GetServicePorts(PodConf),
-			Selector: label,
-		},
-	}
-
-	return ss, svc
+//不知道返回啥还，反正报错肯定要返回,所以暂时就返回一个报错了
+func CreateInstance(conf *InstanceConfig) error {
+	podconf := instanceConfigToPodInfo(conf)
+	return k8s.NewService(podconf)
 }

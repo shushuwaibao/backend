@@ -1,13 +1,18 @@
 package kubernetes
 
 import (
+	"context"
+	"fmt"
+	"gin-template/common"
 	"net"
 	"strconv"
 
+	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes"
 )
 
 func Int32Ptr(i int32) *int32 { return &i }
@@ -124,6 +129,83 @@ func GetServicePorts(pod Pod) []apiv1.ServicePort {
 		}
 	}
 	return ports
+}
+
+func newStatefulSetAndService(podConf Pod) (*appsv1.StatefulSet, *apiv1.Service) {
+	name := podConf.Name
+	metadata := GetStatefulSetMetadata(name, podConf.NameSpace)
+	label := GenerateLabel(name)
+
+	selector := GetPodSelector(label)
+	var containers []apiv1.Container
+	containers = append(containers, GetContainer(podConf))
+	ss := &appsv1.StatefulSet{
+		ObjectMeta: metadata,
+		Spec: appsv1.StatefulSetSpec{
+			ServiceName: name,
+			Replicas:    Int32Ptr(1),
+			Selector:    &selector,
+			Template: apiv1.PodTemplateSpec{
+				ObjectMeta: GetPodTemplateMetadata(label),
+				Spec: apiv1.PodSpec{
+					Containers: containers,
+				},
+			},
+			VolumeClaimTemplates: GetPVC(podConf),
+		},
+	}
+
+	svc := &apiv1.Service{
+		ObjectMeta: metadata,
+		Spec: apiv1.ServiceSpec{
+			Type:     apiv1.ServiceTypeNodePort,
+			Ports:    GetServicePorts(podConf),
+			Selector: label,
+		},
+	}
+
+	return ss, svc
+}
+
+func NewService(pod Pod) error {
+	config := GetConf()
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		common.SysLog(err.Error())
+		return err
+	}
+
+	namespace := pod.NameSpace
+	statefulSetClient := clientset.AppsV1().StatefulSets(namespace) // 更新为 AppsV1
+	serviceClient := clientset.CoreV1().Services(namespace)
+	ss, svc := newStatefulSetAndService(pod)
+
+	common.SysLog("Creating StatefulSet...")
+
+	resultSts, err := statefulSetClient.Create(context.TODO(), ss, metav1.CreateOptions{})
+	if err != nil {
+		common.SysLog(err.Error())
+		return err
+		// panic(err)
+	}
+	{
+		info := fmt.Sprintf("Created StatefulSet %q.\n", resultSts.GetObjectMeta().GetName())
+		common.SysLog(info)
+	}
+
+	common.SysLog("Creating service...")
+
+	resultSvc, err := serviceClient.Create(context.TODO(), svc, metav1.CreateOptions{})
+	if err != nil {
+		common.SysLog(err.Error())
+		return err
+	}
+	{
+		info := fmt.Sprintf("Created service %q.\n", resultSvc.GetObjectMeta().GetName())
+		common.SysLog(info)
+	}
+
+	return nil
 }
 
 // func NewStatefulSetAndService(name string, img_url string, memReq string, memLim string, PVCMem string) (*appsv1.StatefulSet, *apiv1.Service) {

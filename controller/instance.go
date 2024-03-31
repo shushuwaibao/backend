@@ -25,7 +25,10 @@ func RemoveInstancerByInstanceID(c *gin.Context) {
 func CreateInstanceConfigAndStart(c *gin.Context) {
 	// 传入一个配置并启动
 	// 传入的配置是一个json，包含了实例的配置信息，格式未定，按照需要加键值对
-
+	model.InstanceConfig{} 
+	// ...init config
+	
+	model.
 }
 
 func EditInstanceConfig(c *gin.Context) {

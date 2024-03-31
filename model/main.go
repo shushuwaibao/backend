@@ -11,8 +11,6 @@ import (
 
 var DB *gorm.DB
 
-// var Kube_Config *rest.Config
-
 func createRootAccountIfNeed() error {
 	var user User
 	//if user.Status != common.UserStatusEnabled {

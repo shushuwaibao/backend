@@ -19,6 +19,7 @@ type Resource struct {
 
 type Pod struct {
 	Name       string
+	NameSpace  string
 	ImgUrl     string
 	Rescourses Resource
 	Ports      []int32
