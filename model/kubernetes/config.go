@@ -11,7 +11,7 @@ import (
 func GetConf() *rest.Config {
 	kubeconfig := os.Getenv("KUBE_CONFIG")
 	tempconfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-
+	// fmt.Print(conf.id)
 	if err != nil {
 		common.FatalLog(err)
 	}

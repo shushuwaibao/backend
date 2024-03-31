@@ -1,6 +1,8 @@
 package model
 
 import (
+	"fmt"
+
 	"gorm.io/gorm"
 )
 
@@ -16,6 +18,10 @@ type ImageConfig struct {
 	BelongsToWho string  `gorm:"size:255" json:"belongsToWho"` // "user" or "organization"
 	BelongsTo    int     `gorm:"type:int" json:"belongsTo"`    // user id or organization id
 	Permission   string  `gorm:"size:255" json:"permission"`   // "0": public, "1": private
+}
+
+func GetContainerUrl(ii *ImageConfig) string {
+	return fmt.Sprintf("%v/%v:%v", ii.Registry, ii.Name, ii.Version)
 }
 
 // ListAvailableImages lists images based on permission.

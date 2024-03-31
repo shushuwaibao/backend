@@ -27,10 +27,10 @@ type UserContainer struct {
 
 type StorageInfo struct {
 	ID           int    `gorm:"primaryKey" json:"id"`
-	ContainerID  int    `gorm:"int" json:"containerId"`
+	ContainerID  int    `gorm:"int" json:"containerId"` // 应该改为pvcname,我先不处理
 	StorageClass string `gorm:"size:255" json:"storageClass"`
 	Type         string `gorm:"size:255" json:"type"`
-	Size         int    `gorm:"type:int" json:"size"`
+	Size         int    `gorm:"type:int" json:"size"` // 单位为G
 	Path         string `gorm:"size:255" json:"path"`
 	NodeID       int    `gorm:"int" json:"nodeId"`
 }
@@ -38,10 +38,10 @@ type StorageInfo struct {
 type ContainerConfig struct {
 	ConfigID    int     `gorm:"primaryKey" json:"configId"`
 	Name        string  `gorm:"size:255" json:"name"`
-	CpuConf     int     `gorm:"type:int" json:"cpuConf"`
-	GpuConf     int     `gorm:"type:int" json:"gpuConf"`
-	MemoryConf  int     `gorm:"type:int" json:"memoryConf"`
-	DefaultSize int     `gorm:"type:int" json:"defaultSize"`
+	CpuConf     string  `gorm:"size:255" json:"cpuConf"`
+	GpuConf     string  `gorm:"size:255" json:"gpuConf"`
+	MemoryConf  string  `gorm:"size:255" json:"memoryConf"` //?这是不是有点抽象，应该是什么2G啊啥的
+	DefaultSize string  `gorm:"size:255" json:"defaultSize"`
 	Price       float64 `gorm:"type:float" json:"price"`
 }
 
@@ -60,10 +60,47 @@ type InstanceConfig struct {
 	Envs            string
 	Service         string
 	AttachedStorage []StorageInfo // Assuming this field represents the joined data from another table.
-	CPUConf         int           // Assuming you might also want the config details like CPU, Memory etc.
-	MemoryConf      int
-	GPUConf         int
+	CPUConf         string        // Assuming you might also want the config details like CPU, Memory etc.
+	MemoryConf      string
+	GPUConf         string
 	ImageConfig     ImageConfig // Assuming you want details about the image used.
+}
+
+func instanceConfigToPodInfo(instanceConfig *InstanceConfig) k8s.Pod {
+	var ret k8s.Pod
+	// ret.resource.cpu_core_limit = instanceConfig.CPUConf
+	// ret.resource.ram_limit = instanceConfig.MemoryConf
+	// ret.resource.gpu_core_limit = instanceConfig.GPUConf
+	// ret.resource.volumes = make([]k8s.Storage, len(instanceConfig.AttachedStorage))
+	// for i, storage := range instanceConfig.AttachedStorage {
+	// 	ret.resource.volumes[i] = k8s.Storage{
+	// 		pvc_name:      fmt.Sprintf("pvc-%d", storage.ID),
+	// 		memory_limit:  fmt.Sprintf("%dGi", storage.Size),
+	// 		mount_path:    storage.Path,
+	// 		access_mode:   "ReadWriteOnce",
+	// 		storage_class: storage.StorageClass,
+	// 	}
+	// }
+	// ret.name = fmt.Sprint("rdp_desktop", instanceConfig.ID)
+	// ret.img_url = GetContainerUrl(&instanceConfig.ImageConfig)
+	ret.Rescourses.CPULimit = instanceConfig.CPUConf
+	ret.Rescourses.RamLimit = instanceConfig.MemoryConf
+	ret.Rescourses.GPULimit = instanceConfig.GPUConf
+	ret.Name = fmt.Sprint("rdp_desktop", instanceConfig.ID)
+	ret.ImgUrl = GetContainerUrl(&instanceConfig.ImageConfig)
+	ret.Ports = []int32{3389, 22}
+	ret.Rescourses.Volumes = make([]k8s.Storage, len(instanceConfig.AttachedStorage))
+	for i, storage := range instanceConfig.AttachedStorage {
+		ret.Rescourses.Volumes[i] = k8s.Storage{
+			PVCName:      fmt.Sprintf("pvc-%d", storage.ID),
+			RomLimit:     fmt.Sprintf("%dGi", storage.Size),
+			MountPath:    storage.Path,
+			AccessMode:   "ReadWriteOnce",
+			StorageClass: storage.StorageClass,
+		}
+	}
+
+	return ret
 }
 
 func GetUserContainerByID(id int) (*UserContainer, error) {
@@ -109,117 +146,42 @@ func GetAvailableInstanceConfig() ([]ContainerConfig, error) {
 	return configs, err
 }
 
-func NewStatefulSetAndService(instanceConfig *InstanceConfig) (*appsv1.StatefulSet, *apiv1.Service) {
-	name := fmt.Sprint("a", instanceConfig.ID)
-	metadata := k8s.CreateStatefulSetMetadata(name, instanceConfig.Namespace)
-	selector := CreateSelector()
-	containers := createContainers(name, img_url, memReq, memLim)
-	pvc := createPVC(name, PVCMem)
-	servicePorts := createServicePorts()
-	serviceSelector := createServiceSelector(name)
 
-	// 使用上面的子函数来构建 StatefulSet 和 Service
+
+func NewStatefulSetAndService(instanceConfig *InstanceConfig) (*appsv1.StatefulSet, *apiv1.Service) {
+	name := fmt.Sprint("rdp_desktop", instanceConfig.ID)
+	metadata := k8s.GetStatefulSetMetadata(name, instanceConfig.Namespace)
+	label := k8s.GenerateLabel(name)
+
+	selector := k8s.GetPodSelector(label)
+	var containers []apiv1.Container
+	PodConf := instanceConfigToPodInfo(instanceConfig)
+	containers = append(containers, k8s.GetContainer(PodConf))
+	// pvc := k8s.GetPVC(PodConf)
 	ss := &appsv1.StatefulSet{
 		ObjectMeta: metadata,
 		Spec: appsv1.StatefulSetSpec{
 			ServiceName: name,
 			Replicas:    k8s.Int32Ptr(1),
-			Selector:    selector,
+			Selector:    &selector,
 			Template: apiv1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app": "desktop",
-					},
-				},
+				ObjectMeta: k8s.GetPodTemplateMetadata(label),
 				Spec: apiv1.PodSpec{
 					Containers: containers,
 				},
 			},
-			VolumeClaimTemplates: []apiv1.PersistentVolumeClaim{pvc},
+			VolumeClaimTemplates: k8s.GetPVC(PodConf),
 		},
 	}
 
 	svc := &apiv1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
+		ObjectMeta: metadata,
 		Spec: apiv1.ServiceSpec{
 			Type:     apiv1.ServiceTypeNodePort,
-			Ports:    servicePorts,
-			Selector: serviceSelector,
+			Ports:    k8s.GetServicePorts(PodConf),
+			Selector: label,
 		},
 	}
 
 	return ss, svc
 }
-
-// func CreatePodFromInstanceConfig(instanceConfig *InstanceConfig) (*corev1.Pod, error) {
-// 	// 创建Kubernetes客户端
-// 	clientset, err := kubernetes.NewForConfig(Kube_Config)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
-// 	}
-
-// 	var envVars []corev1.EnvVar
-// 	if instanceConfig.Envs != "" {
-// 		err := json.Unmarshal([]byte(instanceConfig.Envs), &envVars)
-// 		if err != nil {
-// 			return nil, fmt.Errorf("failed to unmarshal environment variables: %w", err)
-// 		}
-// 	}
-// 	var volumeMounts []corev1.VolumeMount
-// 	var volumes []corev1.Volume
-
-// 	for _, storage := range instanceConfig.AttachedStorage {
-// 		volumeName := fmt.Sprintf("storage-%d", storage.ID) // 使用存储的ID作为卷的名称
-// 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-// 			Name:      volumeName,
-// 			MountPath: storage.Path, // 使用StorageInfo中定义的挂载路径
-// 		})
-// 		volumes = append(volumes, corev1.Volume{
-// 			Name: volumeName,
-// 			VolumeSource: corev1.VolumeSource{
-// 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-// 					ClaimName: fmt.Sprintf("pvc-%d", storage.ID), // 假设PVC的命名规则为"pvc-"加上存储的ID
-// 				},
-// 			},
-// 		})
-// 	}
-
-// 	pod := &corev1.Pod{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name:      "a" + fmt.Sprint(instanceConfig.ID), // 假设pod名称为"a"加上instance ID
-// 			Namespace: instanceConfig.Namespace,
-// 			Labels:    map[string]string{"app": "instance"},
-// 		},
-// 		Spec: corev1.PodSpec{
-// 			Containers: []corev1.Container{
-// 				{
-// 					Name:    instanceConfig.Label,
-// 					Image:   instanceConfig.ImageConfig.Name, // 假设ImageConfig.Name包含了完整的镜像地址
-// 					Command: []string{"/bin/sh", "-c", instanceConfig.StartCMD},
-// 					Resources: corev1.ResourceRequirements{
-// 						Requests: corev1.ResourceList{
-// 							corev1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%dm", instanceConfig.CPUConf)),
-// 							corev1.ResourceMemory: resource.MustParse(fmt.Sprintf("%dMi", instanceConfig.MemoryConf)),
-// 						},
-// 						Limits: corev1.ResourceList{
-// 							corev1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%dm", instanceConfig.CPUConf*2)), // 假设limit是request的两倍
-// 							corev1.ResourceMemory: resource.MustParse(fmt.Sprintf("%dMi", instanceConfig.MemoryConf*2)),
-// 						},
-// 					},
-// 					Env:          envVars,
-// 					VolumeMounts: volumeMounts,
-// 				},
-// 			},
-// 			Volumes: volumes,
-// 		},
-// 	}
-// 	// 创建Pod
-// 	pod, err = clientset.CoreV1().Pods(instanceConfig.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to create pod: %w", err)
-// 	}
-
-// 	return pod, nil
-// }
