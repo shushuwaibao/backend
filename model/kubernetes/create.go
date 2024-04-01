@@ -139,6 +139,7 @@ func GetServicePorts(pod Pod) []apiv1.ServicePort {
 	ports := make([]apiv1.ServicePort, len(pod.Ports))
 	for i, port := range pod.Ports {
 		ports[i] = apiv1.ServicePort{
+			Name:       fmt.Sprintf("from%vto%v", port, forwardPorts[i]),
 			Port:       int32(port),
 			TargetPort: intstr.FromInt32(port),
 			NodePort:   int32(forwardPorts[i]),
