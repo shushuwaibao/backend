@@ -1,7 +1,10 @@
 package controller
 
 import (
+	"gin-template/common"
 	"gin-template/model"
+	k8s "gin-template/model/kubernetes"
+
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -25,10 +28,21 @@ func RemoveInstancerByInstanceID(c *gin.Context) {
 func CreateInstanceConfigAndStart(c *gin.Context) {
 	// 传入一个配置并启动
 	// 传入的配置是一个json，包含了实例的配置信息，格式未定，按照需要加键值对
-	model.InstanceConfig{} 
-	// ...init config
-	
-	model.
+	common.SysLog("receive a request creating instance")
+	var podconf k8s.Pod
+	err := c.ShouldBindJSON(&podconf)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	common.SysLog("conifg binded")
+
+	err = model.TestInstance(podconf)
+	if err == nil {
+		c.JSON(http.StatusAccepted, gin.H{"info": "successfully created service"})
+	} else {
+		c.String(http.StatusBadRequest, err.Error())
+	}
 }
 
 func EditInstanceConfig(c *gin.Context) {

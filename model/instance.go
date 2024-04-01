@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 	k8s "gin-template/model/kubernetes"
 	"time"
@@ -65,21 +66,6 @@ type InstanceConfig struct {
 
 func instanceConfigToPodInfo(instanceConfig *InstanceConfig) k8s.Pod {
 	var ret k8s.Pod
-	// ret.resource.cpu_core_limit = instanceConfig.CPUConf
-	// ret.resource.ram_limit = instanceConfig.MemoryConf
-	// ret.resource.gpu_core_limit = instanceConfig.GPUConf
-	// ret.resource.volumes = make([]k8s.Storage, len(instanceConfig.AttachedStorage))
-	// for i, storage := range instanceConfig.AttachedStorage {
-	// 	ret.resource.volumes[i] = k8s.Storage{
-	// 		pvc_name:      fmt.Sprintf("pvc-%d", storage.ID),
-	// 		memory_limit:  fmt.Sprintf("%dGi", storage.Size),
-	// 		mount_path:    storage.Path,
-	// 		access_mode:   "ReadWriteOnce",
-	// 		storage_class: storage.StorageClass,
-	// 	}
-	// }
-	// ret.name = fmt.Sprint("rdp_desktop", instanceConfig.ID)
-	// ret.img_url = GetContainerUrl(&instanceConfig.ImageConfig)
 	ret.Rescourses.CPULimit = instanceConfig.CPUConf
 	ret.Rescourses.RamLimit = instanceConfig.MemoryConf
 	ret.Rescourses.GPULimit = instanceConfig.GPUConf
@@ -147,4 +133,26 @@ func GetAvailableInstanceConfig() ([]ContainerConfig, error) {
 func CreateInstance(conf *InstanceConfig) error {
 	podconf := instanceConfigToPodInfo(conf)
 	return k8s.NewService(podconf)
+}
+
+func TestInstance(pod k8s.Pod) error {
+	if pod.Rescourses.Volumes == nil {
+		pod.Rescourses.Volumes = make([]k8s.Storage, 0)
+		pod.Rescourses.Volumes = append(pod.Rescourses.Volumes, k8s.Storage{
+			PVCName:      fmt.Sprint("pvc-", pod.Name),
+			RomLimit:     "15Gi",
+			MountPath:    "/home/default",
+			AccessMode:   "ReadWriteOnce",
+			StorageClass: "nfs-storage",
+		})
+	}
+
+	// fmt.Print(pod.Marshal()
+	{
+		// print pod to debug
+		data, _ := json.Marshal(pod)
+		fmt.Println(string(data))
+	}
+
+	return k8s.NewService(pod)
 }

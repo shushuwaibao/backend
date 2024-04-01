@@ -28,20 +28,21 @@ func SetApiRouter(router *gin.Engine) {
 			userRoute.POST("/login", middleware.CriticalRateLimit(), controller.Login)
 			userRoute.GET("/logout", controller.Logout)
 
-			selfRoute := userRoute.Group("/")
-			selfRoute.Use(middleware.UserAuth(), middleware.NoTokenAuth())
-			{
-				selfRoute.GET("/self", controller.GetSelf)
-				selfRoute.PUT("/self", controller.UpdateSelf)
-				selfRoute.DELETE("/self", controller.DeleteSelf)
-				selfRoute.GET("/token", controller.GenerateToken)
-			}
+			// selfRoute := userRoute.Group("/")
+			// selfRoute.Use(middleware.UserAuth(), middleware.NoTokenAuth())
+			// {
+			// 	selfRoute.GET("/self", controller.GetSelf)
+			// 	selfRoute.PUT("/self", controller.UpdateSelf)
+			// 	selfRoute.DELETE("/self", controller.DeleteSelf)
+			// 	selfRoute.GET("/token", controller.GenerateToken)
+			// }
 
 			manageRoute := userRoute.Group("/manage")
-			manageRoute.Use() //dev, no auth
+			// manageRoute.Use() //dev, no auth
 			// manageRoute.Use(middleware.UserAuth(), middleware.NoTokenAuth())
 			{
 				manageRoute.GET("/getconfs", controller.GetAllAvailableInstanceConfig)
+				// common.SysLog("receive a request creating instance")
 				manageRoute.POST("/create", controller.CreateInstanceConfigAndStart)
 				manageRoute.POST("/start", controller.StartInstanceByInstanceID)
 				manageRoute.POST("/stop", controller.StopInstanceByInstanceID)
@@ -50,17 +51,17 @@ func SetApiRouter(router *gin.Engine) {
 				manageRoute.POST("/edit", controller.EditInstanceConfig)
 			}
 
-			adminRoute := userRoute.Group("/")
-			adminRoute.Use(middleware.AdminAuth(), middleware.NoTokenAuth())
-			{
-				adminRoute.GET("/", controller.GetAllUsers)
-				adminRoute.GET("/search", controller.SearchUsers)
-				adminRoute.GET("/:id", controller.GetUser)
-				adminRoute.POST("/", controller.CreateUser)
-				adminRoute.POST("/manage", controller.ManageUser)
-				adminRoute.PUT("/", controller.UpdateUser)
-				adminRoute.DELETE("/:id", controller.DeleteUser)
-			}
+			// adminRoute := userRoute.Group("/")
+			// adminRoute.Use(middleware.AdminAuth(), middleware.NoTokenAuth())
+			// {
+			// 	adminRoute.GET("/", controller.GetAllUsers)
+			// 	adminRoute.GET("/search", controller.SearchUsers)
+			// 	adminRoute.GET("/:id", controller.GetUser)
+			// 	adminRoute.POST("/", controller.CreateUser)
+			// 	adminRoute.POST("/manage", controller.ManageUser)
+			// 	adminRoute.PUT("/", controller.UpdateUser)
+			// 	adminRoute.DELETE("/:id", controller.DeleteUser)
+			// }
 		}
 		optionRoute := apiRouter.Group("/option")
 		optionRoute.Use(middleware.RootAuth(), middleware.NoTokenAuth())
