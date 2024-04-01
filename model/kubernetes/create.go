@@ -199,25 +199,26 @@ func NewService(pod Pod) error {
 	common.SysLog("Checking if StatefulSet exists...")
 	existSts, err := statefulSetClient.Get(context.TODO(), ss.Name, metav1.GetOptions{})
 
-	if err != nil {
-		common.SysLog("StatefulSet does not exist, creating...")
-		common.SysError(err.Error())
+	if err == nil {
+		common.SysLog(fmt.Sprintf("StatefulSet %s already exists, deleting...", existSts.Name))
+		err := statefulSetClient.Delete(context.TODO(), ss.Name, metav1.DeleteOptions{})
+		if err != nil {
+			common.SysLog(err.Error())
+			return err
+		} else {
+			info := fmt.Sprintf("Deleted StatefulSet %q.\n", existSts.GetObjectMeta().GetName())
+			common.SysLog(info)
+		}
+	}
+
+	{
+		common.SysLog("Creating StatefulSet...")
 		resultSts, err := statefulSetClient.Create(context.TODO(), ss, metav1.CreateOptions{})
 		if err != nil {
 			common.SysLog(err.Error())
 			return err
 		} else {
 			info := fmt.Sprintf("Created StatefulSet %q.\n", resultSts.GetObjectMeta().GetName())
-			common.SysLog(info)
-		}
-	} else {
-		common.SysLog(fmt.Sprintf("StatefulSet %s already exists, updating...\n", existSts.Name))
-		updSts, err := statefulSetClient.Update(context.TODO(), ss, metav1.UpdateOptions{})
-		if err != nil {
-			common.SysLog(err.Error())
-			return err
-		} else {
-			info := fmt.Sprintf("Updated StatefulSet %q.\n", updSts.GetObjectMeta().GetName())
 			common.SysLog(info)
 		}
 	}
@@ -238,7 +239,7 @@ func NewService(pod Pod) error {
 	}
 
 	{
-		common.SysLog("service not exsit, creating...")
+		common.SysLog("creating service ...")
 		common.SysError(err.Error())
 		resultSvc, err := serviceClient.Create(context.TODO(), svc, metav1.CreateOptions{})
 		if err != nil {
