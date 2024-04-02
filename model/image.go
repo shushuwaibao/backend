@@ -8,16 +8,16 @@ import (
 
 // ImageConfig represents the model for an image configuration in the database.
 type ImageConfig struct {
-	ID           int     `gorm:"primaryKey" json:"id"`
-	Nickname     string  `gorm:"size:255" json:"nickname"`
-	Name         string  `gorm:"size:255" json:"name"`
-	Registry     string  `gorm:"size:255" json:"registry"`
-	Version      string  `gorm:"size:255" json:"version"`
-	Description  string  `gorm:"type:text" json:"description"`
-	Size         float64 `gorm:"type:float" json:"size"`
-	BelongsToWho int     `gorm:"type:int" json:"belongsToWho"` // "user" = 0 ,"organization" = 1
-	BelongsTo    int     `gorm:"type:int" json:"belongsTo"`    // user id or organization id
-	Permission   string  `gorm:"size:255" json:"permission"`   // "0": public, "1": private
+	ID           int    `gorm:"primaryKey" json:"id"`
+	Nickname     string `gorm:"size:255" json:"nickname"`
+	Name         string `gorm:"size:255" json:"name"`
+	Registry     string `gorm:"size:255" json:"registry"`
+	Version      string `gorm:"size:255" json:"version"`
+	Description  string `gorm:"type:text" json:"description"`
+	Size         string `gorm:"size:255" json:"size"`
+	BelongsToWho int    `gorm:"type:int" json:"belongsToWho"` // "user" = 0 ,"organization" = 1
+	BelongsTo    int    `gorm:"type:int" json:"belongsTo"`    // user id or organization id
+	Permission   string `gorm:"size:255" json:"permission"`   // "0": public, "1": private
 }
 
 func GetContainerUrl(ii *ImageConfig) string {

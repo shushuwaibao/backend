@@ -16,7 +16,7 @@ type UserContainer struct {
 	ImageID      int       `gorm:"type:char(36)" json:"imageId"`
 	CreatedAt    time.Time `gorm:"not null" json:"createdAt"`
 	TotalRuntime int       `gorm:"type:int" json:"totalRuntime"`
-	LastBoot     time.Time `json:"lastBoot"`
+	LastBoot     time.Time `gorm:"not null" json:"lastBoot"`
 	StartCMD     string    `gorm:"size:255" json:"startCmd"`
 	Status       string    `gorm:"size:255" json:"status"`
 	Envs         string    `gorm:"type:json" json:"envs"`
@@ -31,7 +31,7 @@ type StorageInfo struct {
 	StorageClass string `gorm:"size:255" json:"storageClass"`
 	AccessMode   string `gorm:"size:255" json:"accessMode"`
 	Type         string `gorm:"size:255" json:"type"`
-	Size         string `gorm:"type:int" json:"size"` // 单位为G
+	Size         string `gorm:"size:255" json:"size"` // 单位为G
 	Path         string `gorm:"size:255" json:"path"`
 	NodeID       int    `gorm:"int" json:"nodeId"`
 }
@@ -145,32 +145,35 @@ func CreateInstance(conf *InstanceConfig) error {
 	return k8s.NewService(podconf)
 }
 
-func TestInstance(pod k8s.Pod) error {
-	if pod.Rescourses.Volumes == nil {
-		pod.Rescourses.Volumes = make([]k8s.Storage, 0)
-		pod.Rescourses.Volumes = append(pod.Rescourses.Volumes, k8s.Storage{
-			PVCName:      fmt.Sprint("pvc-", pod.Name),
-			RomLimit:     "15Gi",
-			MountPath:    "/home/default",
-			AccessMode:   "ReadWriteOnce",
-			StorageClass: "nfs-storage",
-		})
-	}
+// func TestInstance(pod k8s.Pod) error {
+// 	if pod.Rescourses.Volumes == nil {
+// 		pod.Rescourses.Volumes = make([]k8s.Storage, 0)
+// 		pod.Rescourses.Volumes = append(pod.Rescourses.Volumes, k8s.Storage{
+// 			PVCName:      fmt.Sprint("pvc-", pod.Name),
+// 			RomLimit:     "15Gi",
+// 			MountPath:    "/home/default",
+// 			AccessMode:   "ReadWriteOnce",
+// 			StorageClass: "nfs-storage",
+// 		})
+// 	}
 
-	// fmt.Print(pod.Marshal()
-	{
-		// print pod to debug
-		data, _ := json.Marshal(pod)
-		fmt.Println(string(data))
-	}
+// 	// fmt.Print(pod.Marshal()
+// 	{
+// 		// print pod to debug
+// 		data, _ := json.Marshal(pod)
+// 		fmt.Println(string(data))
+// 	}
 
-	return k8s.NewService(pod)
-}
+// 	return k8s.NewService(pod)
+// }
 
 func TestInstancev2(podconfig k8s.PodConfig) error {
 
 	var pod k8s.Pod
 
+	pod.Name = podconfig.Name
+	pod.NameSpace = podconfig.NameSpace
+	pod.Ports = podconfig.Resourses.Ports
 	if pod.Rescourses.Volumes == nil {
 		pod.Rescourses.Volumes = make([]k8s.Storage, 0)
 		pod.Rescourses.Volumes = append(pod.Rescourses.Volumes, k8s.Storage{
@@ -181,10 +184,6 @@ func TestInstancev2(podconfig k8s.PodConfig) error {
 			StorageClass: "nfs-storage",
 		})
 	}
-	pod.Name = podconfig.Name
-	pod.NameSpace = podconfig.NameSpace
-	pod.Ports = podconfig.Resourses.Ports
-
 	resouse, err := GetConfigByID(podconfig.Resourses.ConfigID)
 	if err != nil {
 		return err
@@ -221,8 +220,12 @@ func SaveCreateConfig(podConfig k8s.PodConfig, userid int) (int, error) {
 		UserID:    userid,                       // 假设这里是从上下文或其它地方获取的用户ID
 		ImageID:   podConfig.ImgID,              // 假设这里是已知的或从PodConfig中提取的镜像ID
 		CreatedAt: time.Now(),
+		LastBoot:  time.Now(),
 		StartCMD:  "",     // 根据需要设置
 		Status:    "stop", // 假设新创建的容器初始状态为running
+		Envs:      "{}",   // Envs, Ports, Service等字段根据PodConfig设置
+		Ports:     "{}",
+		Service:   "{}",
 		// Envs, Ports, Service等字段根据PodConfig设置
 	}
 
@@ -234,7 +237,7 @@ func SaveCreateConfig(podConfig k8s.PodConfig, userid int) (int, error) {
 	// 创建StorageInfo记录
 	storageInfo := StorageInfo{
 		ContainerID:  userContainer.ID, // 使用UserContainer的ID
-		PVCName:      fmt.Sprintf("pvc-%s", podConfig.Name),
+		PVCName:      fmt.Sprintf("pvc-%v", podConfig.Name),
 		Size:         podConfig.Resourses.DefaultVolumeSize,
 		Path:         "/home/default",
 		AccessMode:   "ReadWriteOnce",

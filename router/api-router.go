@@ -37,19 +37,17 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.GET("/token", controller.GenerateToken)
 			}
 
-			instanceManagerRoute := userRoute.Group("/instance")
-			// instanceManagerRoute.Use() //dev, no auth
-			instanceManagerRoute.Use(middleware.UserAuth(), middleware.NoTokenAuth())
+			instanceRoute := userRoute.Group("/instance")
+			// instanceRoute.Use() //dev, no auth
+			instanceRoute.Use(middleware.UserAuth(), middleware.NoTokenAuth())
 			{
-				instanceManagerRoute.GET("/getconfs", controller.GetAllAvailableInstanceConfig)
-				// common.SysLog("receive a request creating instance")
-				// instanceManagerRoute.POST("/create", controller.CreateInstanceConfigAndStart)
-				instanceManagerRoute.POST("/create", controller.CreateInstanceConfigAndStartv3)
-				instanceManagerRoute.POST("/start", controller.StartInstanceByInstanceID)
-				instanceManagerRoute.POST("/stop", controller.StopInstanceByInstanceID)
-				instanceManagerRoute.POST("/remove", controller.RemoveInstancerByInstanceID)
-				instanceManagerRoute.POST("/export", controller.ExportInstanceImage)
-				instanceManagerRoute.POST("/edit", controller.EditInstanceConfig)
+				instanceRoute.GET("/getconfs", controller.GetAllAvailableInstanceConfig)
+				instanceRoute.POST("/create", controller.CreateInstanceConfigAndStartv3)
+				instanceRoute.POST("/start", controller.StartInstanceByInstanceID)
+				instanceRoute.POST("/stop", controller.StopInstanceByInstanceID)
+				instanceRoute.POST("/remove", controller.RemoveInstancerByInstanceID)
+				instanceRoute.POST("/export", controller.ExportInstanceImage)
+				instanceRoute.POST("/edit", controller.EditInstanceConfig)
 			}
 
 			adminRoute := userRoute.Group("/")

@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"gin-template/common"
 	"gin-template/model"
 	k8s "gin-template/model/kubernetes"
@@ -25,25 +26,25 @@ func RemoveInstancerByInstanceID(c *gin.Context) {
 
 }
 
-func CreateInstanceConfigAndStart(c *gin.Context) {
-	// 传入一个配置并启动
-	// 传入的配置是一个json，包含了实例的配置信息，格式未定，按照需要加键值对
-	common.SysLog("receive a request creating instance")
-	var podconf k8s.Pod
-	err := c.ShouldBindJSON(&podconf)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	common.SysLog("conifg binded")
+// func CreateInstanceConfigAndStart(c *gin.Context) {
+// 	// 传入一个配置并启动
+// 	// 传入的配置是一个json，包含了实例的配置信息，格式未定，按照需要加键值对
+// 	common.SysLog("receive a request creating instance")
+// 	var podconf k8s.Pod
+// 	err := c.ShouldBindJSON(&podconf)
+// 	if err != nil {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// 		return
+// 	}
+// 	common.SysLog("conifg binded")
 
-	err = model.TestInstance(podconf)
-	if err == nil {
-		c.JSON(http.StatusAccepted, gin.H{"info": "successfully created service"})
-	} else {
-		c.String(http.StatusBadRequest, err.Error())
-	}
-}
+// 	err = model.TestInstance(podconf)
+// 	if err == nil {
+// 		c.JSON(http.StatusAccepted, gin.H{"info": "successfully created service"})
+// 	} else {
+// 		c.String(http.StatusBadRequest, err.Error())
+// 	}
+// }
 
 func CreateInstanceConfigAndStartv3(c *gin.Context) {
 	/*
@@ -76,7 +77,8 @@ func CreateInstanceConfigAndStartv3(c *gin.Context) {
 	}
 	common.SysLog("conifg binded")
 
-	podconf.Name = podconf.Name + string(userID.(int))
+	podconf.Name = fmt.Sprint(podconf.Name, "-", userID)
+	common.SysLog("config name: " + podconf.Name)
 	cid, err := model.SaveCreateConfig(podconf, userID.(int))
 	if err != nil {
 		c.String(http.StatusBadRequest, err.Error())

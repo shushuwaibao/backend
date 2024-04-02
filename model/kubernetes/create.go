@@ -63,6 +63,9 @@ func GetContainer(pod Pod) apiv1.Container {
 			Limits: apiv1.ResourceList{
 				apiv1.ResourceMemory: resource.MustParse(pod.Rescourses.RamLimit),
 			},
+			Requests: apiv1.ResourceList{
+				apiv1.ResourceMemory: resource.MustParse("512Mi"),
+			},
 		},
 		VolumeMounts: mounts,
 	}
@@ -241,7 +244,6 @@ func NewService(pod Pod) error {
 
 	{
 		common.SysLog("creating service ...")
-		common.SysError(err.Error())
 		resultSvc, err := serviceClient.Create(context.TODO(), svc, metav1.CreateOptions{})
 		if err != nil {
 			common.SysLog(err.Error())
