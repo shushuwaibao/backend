@@ -15,7 +15,7 @@ type ImageConfig struct {
 	Version      string  `gorm:"size:255" json:"version"`
 	Description  string  `gorm:"type:text" json:"description"`
 	Size         float64 `gorm:"type:float" json:"size"`
-	BelongsToWho string  `gorm:"size:255" json:"belongsToWho"` // "user" or "organization"
+	BelongsToWho int     `gorm:"type:int" json:"belongsToWho"` // "user" = 0 ,"organization" = 1
 	BelongsTo    int     `gorm:"type:int" json:"belongsTo"`    // user id or organization id
 	Permission   string  `gorm:"size:255" json:"permission"`   // "0": public, "1": private
 }
@@ -50,4 +50,8 @@ func ListAvailableImages(db *gorm.DB, belongsToWho string, belongsToId int) ([]I
 	}
 
 	return images, nil
+}
+
+func InsertImage(image *ImageConfig) error {
+	return DB.Create(image).Error
 }

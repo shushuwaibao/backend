@@ -28,41 +28,41 @@ func SetApiRouter(router *gin.Engine) {
 			userRoute.POST("/login", middleware.CriticalRateLimit(), controller.Login)
 			userRoute.GET("/logout", controller.Logout)
 
-			// selfRoute := userRoute.Group("/")
-			// selfRoute.Use(middleware.UserAuth(), middleware.NoTokenAuth())
-			// {
-			// 	selfRoute.GET("/self", controller.GetSelf)
-			// 	selfRoute.PUT("/self", controller.UpdateSelf)
-			// 	selfRoute.DELETE("/self", controller.DeleteSelf)
-			// 	selfRoute.GET("/token", controller.GenerateToken)
-			// }
-
-			manageRoute := userRoute.Group("/manage")
-			// manageRoute.Use() //dev, no auth
-			manageRoute.Use(middleware.UserAuth(), middleware.NoTokenAuth())
+			selfRoute := userRoute.Group("/")
+			selfRoute.Use(middleware.UserAuth(), middleware.NoTokenAuth())
 			{
-				manageRoute.GET("/getconfs", controller.GetAllAvailableInstanceConfig)
-				// common.SysLog("receive a request creating instance")
-				// manageRoute.POST("/create", controller.CreateInstanceConfigAndStart)
-				manageRoute.POST("/create", controller.CreateInstanceConfigAndStartv3)
-				manageRoute.POST("/start", controller.StartInstanceByInstanceID)
-				manageRoute.POST("/stop", controller.StopInstanceByInstanceID)
-				manageRoute.POST("/remove", controller.RemoveInstancerByInstanceID)
-				manageRoute.POST("/export", controller.ExportInstanceImage)
-				manageRoute.POST("/edit", controller.EditInstanceConfig)
+				selfRoute.GET("/self", controller.GetSelf)
+				selfRoute.PUT("/self", controller.UpdateSelf)
+				selfRoute.DELETE("/self", controller.DeleteSelf)
+				selfRoute.GET("/token", controller.GenerateToken)
 			}
 
-			// adminRoute := userRoute.Group("/")
-			// adminRoute.Use(middleware.AdminAuth(), middleware.NoTokenAuth())
-			// {
-			// 	adminRoute.GET("/", controller.GetAllUsers)
-			// 	adminRoute.GET("/search", controller.SearchUsers)
-			// 	adminRoute.GET("/:id", controller.GetUser)
-			// 	adminRoute.POST("/", controller.CreateUser)
-			// 	adminRoute.POST("/manage", controller.ManageUser)
-			// 	adminRoute.PUT("/", controller.UpdateUser)
-			// 	adminRoute.DELETE("/:id", controller.DeleteUser)
-			// }
+			instanceManagerRoute := userRoute.Group("/instance")
+			// instanceManagerRoute.Use() //dev, no auth
+			instanceManagerRoute.Use(middleware.UserAuth(), middleware.NoTokenAuth())
+			{
+				instanceManagerRoute.GET("/getconfs", controller.GetAllAvailableInstanceConfig)
+				// common.SysLog("receive a request creating instance")
+				// instanceManagerRoute.POST("/create", controller.CreateInstanceConfigAndStart)
+				instanceManagerRoute.POST("/create", controller.CreateInstanceConfigAndStartv3)
+				instanceManagerRoute.POST("/start", controller.StartInstanceByInstanceID)
+				instanceManagerRoute.POST("/stop", controller.StopInstanceByInstanceID)
+				instanceManagerRoute.POST("/remove", controller.RemoveInstancerByInstanceID)
+				instanceManagerRoute.POST("/export", controller.ExportInstanceImage)
+				instanceManagerRoute.POST("/edit", controller.EditInstanceConfig)
+			}
+
+			adminRoute := userRoute.Group("/")
+			adminRoute.Use(middleware.AdminAuth(), middleware.NoTokenAuth())
+			{
+				adminRoute.GET("/", controller.GetAllUsers)
+				adminRoute.GET("/search", controller.SearchUsers)
+				adminRoute.GET("/:id", controller.GetUser)
+				adminRoute.POST("/", controller.CreateUser)
+				adminRoute.POST("/manage", controller.ManageUser)
+				adminRoute.PUT("/", controller.UpdateUser)
+				adminRoute.DELETE("/:id", controller.DeleteUser)
+			}
 		}
 		optionRoute := apiRouter.Group("/option")
 		optionRoute.Use(middleware.RootAuth(), middleware.NoTokenAuth())
