@@ -24,3 +24,18 @@ type Pod struct {
 	Rescourses Resource `json:"resources"`
 	Ports      []int32  `json:"ports" defalut:"{3398,22}"`
 }
+
+type Resource1 struct {
+	DefaultVolumeSize string  `json:"default_volume_size" default:"15Gi"`
+	ConfigID          int     `json:"config_id" binding:"required"`
+	Ports             []int32 `json:"ports" defalut:"{3398,22}"`
+}
+
+type PodConfig struct {
+	Name      string `json:"name" binding:"required"`
+	NameSpace string `json:"namespace" default:"default"`
+	// ImgUrl     string   `json:"img_url" default:"172.16.13.73:18443/wb/lubuntu:v1.3"`
+	ImgID     int       `json:"img_id" binding:"required"`
+	Resourses Resource1 `json:"resources"`
+	// Ports      []int32  `json:"ports" defalut:"{3398,22}"`
+}

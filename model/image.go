@@ -24,6 +24,14 @@ func GetContainerUrl(ii *ImageConfig) string {
 	return fmt.Sprintf("%v/%v:%v", ii.Registry, ii.Name, ii.Version)
 }
 
+func GetImageUrlByID(id int) (string, error) {
+	var image ImageConfig
+	if err := DB.First(&image, id).Error; err != nil {
+		return "", err
+	}
+	return GetContainerUrl(&image), nil
+}
+
 // ListAvailableImages lists images based on permission.
 // It selects public images and private images that belong to the specified user or organization.
 func ListAvailableImages(db *gorm.DB, belongsToWho string, belongsToId int) ([]ImageConfig, error) {

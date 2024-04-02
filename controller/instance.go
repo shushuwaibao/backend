@@ -45,6 +45,57 @@ func CreateInstanceConfigAndStart(c *gin.Context) {
 	}
 }
 
+func CreateInstanceConfigAndStartv3(c *gin.Context) {
+	/*
+
+		{
+		  "name": "test-api",
+		  "namespace": "default",
+		  "img_id": 1,
+		  "resources": {
+				"config_id" : 1,
+				"default_volume_size": "15Gi"
+				"Ports": [3389:22222]
+		  }
+		}
+
+
+	*/
+	userID, exists := c.Get("id")
+	if !exists {
+		// 如果不存在，可能是因为用户未认证
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	// save config
+	var podconf k8s.PodConfig
+	err := c.ShouldBindJSON(&podconf)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	common.SysLog("conifg binded")
+
+	podconf.Name = podconf.Name + string(userID.(int))
+	cid, err := model.SaveCreateConfig(podconf, userID.(int))
+	if err != nil {
+		c.String(http.StatusBadRequest, err.Error())
+		return
+	}
+
+	err = model.TestInstancev2(podconf)
+	if err == nil {
+		err = model.SetUserContainerStatus(cid, "running")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "config successfully saved but service failed"})
+			return
+		}
+		c.JSON(http.StatusAccepted, gin.H{"info": "successfully created service"})
+	} else {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "config successfully saved but service failed"})
+	}
+}
+
 func EditInstanceConfig(c *gin.Context) {
 	// 传入一个id和一个修改后的配置json，根据id修改配置
 }
