@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 	k8s "gin-template/model/kubernetes"
 	"time"
@@ -10,24 +11,27 @@ type UserContainer struct {
 	ID           int       `gorm:"primaryKey" json:"id"`
 	Label        string    `gorm:"size:255" json:"label"`
 	Namespace    string    `gorm:"type:char(36)" json:"namespace"`
-	ConfigID     string    `gorm:"type:char(36)" json:"configId"`
-	UserID       string    `gorm:"type:char(36)" json:"userId"`
-	ImageID      string    `gorm:"type:char(36)" json:"imageId"`
+	ConfigID     int       `gorm:"type:char(36)" json:"configId"`
+	UserID       int       `gorm:"type:char(36)" json:"userId"`
+	ImageID      int       `gorm:"type:char(36)" json:"imageId"`
 	CreatedAt    time.Time `gorm:"not null" json:"createdAt"`
 	TotalRuntime int       `gorm:"type:int" json:"totalRuntime"`
-	LastBoot     time.Time `json:"lastBoot"`
+	LastBoot     time.Time `gorm:"not null" json:"lastBoot"`
 	StartCMD     string    `gorm:"size:255" json:"startCmd"`
 	Status       string    `gorm:"size:255" json:"status"`
 	Envs         string    `gorm:"type:json" json:"envs"`
+	Ports        string    `gorm:"type:json" json:"ports"`
 	Service      string    `gorm:"type:json" json:"service"`
 }
 
 type StorageInfo struct {
 	ID           int    `gorm:"primaryKey" json:"id"`
-	ContainerID  int    `gorm:"int" json:"containerId"` // 应该改为pvcname,我先不处理
+	ContainerID  int    `gorm:"int" json:"containerId"` // 应该改为pvcname,我先不处理 处理牛魔，没这个你怎么知道这是哪个容器的
+	PVCName      string `gorm:"size:255" json:"pvcName"`
 	StorageClass string `gorm:"size:255" json:"storageClass"`
+	AccessMode   string `gorm:"size:255" json:"accessMode"`
 	Type         string `gorm:"size:255" json:"type"`
-	Size         int    `gorm:"type:int" json:"size"` // 单位为G
+	Size         string `gorm:"size:255" json:"size"` // 单位为G
 	Path         string `gorm:"size:255" json:"path"`
 	NodeID       int    `gorm:"int" json:"nodeId"`
 }
@@ -54,6 +58,7 @@ type InstanceConfig struct {
 	LastBoot        time.Time
 	StartCMD        string
 	Status          string
+	Ports           string
 	Envs            string
 	Service         string
 	AttachedStorage []StorageInfo // Assuming this field represents the joined data from another table.
@@ -65,21 +70,6 @@ type InstanceConfig struct {
 
 func instanceConfigToPodInfo(instanceConfig *InstanceConfig) k8s.Pod {
 	var ret k8s.Pod
-	// ret.resource.cpu_core_limit = instanceConfig.CPUConf
-	// ret.resource.ram_limit = instanceConfig.MemoryConf
-	// ret.resource.gpu_core_limit = instanceConfig.GPUConf
-	// ret.resource.volumes = make([]k8s.Storage, len(instanceConfig.AttachedStorage))
-	// for i, storage := range instanceConfig.AttachedStorage {
-	// 	ret.resource.volumes[i] = k8s.Storage{
-	// 		pvc_name:      fmt.Sprintf("pvc-%d", storage.ID),
-	// 		memory_limit:  fmt.Sprintf("%dGi", storage.Size),
-	// 		mount_path:    storage.Path,
-	// 		access_mode:   "ReadWriteOnce",
-	// 		storage_class: storage.StorageClass,
-	// 	}
-	// }
-	// ret.name = fmt.Sprint("rdp_desktop", instanceConfig.ID)
-	// ret.img_url = GetContainerUrl(&instanceConfig.ImageConfig)
 	ret.Rescourses.CPULimit = instanceConfig.CPUConf
 	ret.Rescourses.RamLimit = instanceConfig.MemoryConf
 	ret.Rescourses.GPULimit = instanceConfig.GPUConf
@@ -143,8 +133,121 @@ func GetAvailableInstanceConfig() ([]ContainerConfig, error) {
 	return configs, err
 }
 
-//不知道返回啥还，反正报错肯定要返回,所以暂时就返回一个报错了
+func GetConfigByID(id int) (*ContainerConfig, error) {
+	var config ContainerConfig
+	err := DB.First(&config, id).Error
+	return &config, err
+}
+
+// 不知道返回啥还，反正报错肯定要返回,所以暂时就返回一个报错了
 func CreateInstance(conf *InstanceConfig) error {
 	podconf := instanceConfigToPodInfo(conf)
 	return k8s.NewService(podconf)
+}
+
+// func TestInstance(pod k8s.Pod) error {
+// 	if pod.Rescourses.Volumes == nil {
+// 		pod.Rescourses.Volumes = make([]k8s.Storage, 0)
+// 		pod.Rescourses.Volumes = append(pod.Rescourses.Volumes, k8s.Storage{
+// 			PVCName:      fmt.Sprint("pvc-", pod.Name),
+// 			RomLimit:     "15Gi",
+// 			MountPath:    "/home/default",
+// 			AccessMode:   "ReadWriteOnce",
+// 			StorageClass: "nfs-storage",
+// 		})
+// 	}
+
+// 	// fmt.Print(pod.Marshal()
+// 	{
+// 		// print pod to debug
+// 		data, _ := json.Marshal(pod)
+// 		fmt.Println(string(data))
+// 	}
+
+// 	return k8s.NewService(pod)
+// }
+
+func TestInstancev2(podconfig k8s.PodConfig) error {
+
+	var pod k8s.Pod
+
+	pod.Name = podconfig.Name
+	pod.NameSpace = podconfig.NameSpace
+	pod.Ports = podconfig.Resourses.Ports
+	if pod.Rescourses.Volumes == nil {
+		pod.Rescourses.Volumes = make([]k8s.Storage, 0)
+		pod.Rescourses.Volumes = append(pod.Rescourses.Volumes, k8s.Storage{
+			PVCName:      fmt.Sprint("pvc-", pod.Name),
+			RomLimit:     podconfig.Resourses.DefaultVolumeSize,
+			MountPath:    "/home/default",
+			AccessMode:   "ReadWriteOnce",
+			StorageClass: "nfs-storage",
+		})
+	}
+	resouse, err := GetConfigByID(podconfig.Resourses.ConfigID)
+	if err != nil {
+		return err
+	}
+	imageurl, err := GetImageUrlByID(podconfig.ImgID)
+	if err != nil {
+		return err
+	}
+	pod.ImgUrl = imageurl
+
+	pod.Rescourses.CPULimit = resouse.CpuConf
+	pod.Rescourses.GPULimit = resouse.GpuConf
+	pod.Rescourses.RamLimit = resouse.MemoryConf
+
+	{
+		// print pod to debug
+		data, _ := json.Marshal(pod)
+		fmt.Println(string(data))
+	}
+
+	return k8s.NewService(pod)
+}
+
+func SetUserContainerStatus(id int, status string) error {
+	return DB.Model(&UserContainer{}).Where("id = ?", id).Update("status", status).Error
+}
+
+func SaveCreateConfig(podConfig k8s.PodConfig, userid int) (int, error) {
+	// 创建UserContainer记录
+	userContainer := UserContainer{
+		Label:     podConfig.Name,
+		Namespace: podConfig.NameSpace,
+		ConfigID:  podConfig.Resourses.ConfigID, // 确保ConfigID为字符串
+		UserID:    userid,                       // 假设这里是从上下文或其它地方获取的用户ID
+		ImageID:   podConfig.ImgID,              // 假设这里是已知的或从PodConfig中提取的镜像ID
+		CreatedAt: time.Now(),
+		LastBoot:  time.Now(),
+		StartCMD:  "",     // 根据需要设置
+		Status:    "stop", // 假设新创建的容器初始状态为running
+		Envs:      "{}",   // Envs, Ports, Service等字段根据PodConfig设置
+		Ports:     "{}",
+		Service:   "{}",
+		// Envs, Ports, Service等字段根据PodConfig设置
+	}
+
+	// 保存UserContainer到数据库
+	if err := DB.Create(&userContainer).Error; err != nil {
+		return -1, fmt.Errorf("failed to create user container: %w", err)
+	}
+
+	// 创建StorageInfo记录
+	storageInfo := StorageInfo{
+		ContainerID:  userContainer.ID, // 使用UserContainer的ID
+		PVCName:      fmt.Sprintf("pvc-%v", podConfig.Name),
+		Size:         podConfig.Resourses.DefaultVolumeSize,
+		Path:         "/home/default",
+		AccessMode:   "ReadWriteOnce",
+		StorageClass: "nfs-storage",
+	}
+
+	// 保存StorageInfo到数据库
+	if err := DB.Create(&storageInfo).Error; err != nil {
+		return -1, fmt.Errorf("failed to create storage info: %w", err)
+	}
+
+	return userContainer.ID, nil
 }

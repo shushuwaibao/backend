@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"gin-template/common"
-	"net"
-	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -65,6 +63,9 @@ func GetContainer(pod Pod) apiv1.Container {
 			Limits: apiv1.ResourceList{
 				apiv1.ResourceMemory: resource.MustParse(pod.Rescourses.RamLimit),
 			},
+			Requests: apiv1.ResourceList{
+				apiv1.ResourceMemory: resource.MustParse("512Mi"),
+			},
 		},
 		VolumeMounts: mounts,
 	}
@@ -96,19 +97,36 @@ func GetPVC(pod Pod) []apiv1.PersistentVolumeClaim {
 	return pvcs
 }
 
-func checkPort(port int32) bool {
-	addr := ":" + strconv.FormatInt(int64(port), 10)
-	listener, err := net.Listen("tcp", addr)
+func checkPort(targetPort int32) bool {
+	config := GetConf()
+	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return false
+		panic(err.Error())
 	}
-	listener.Close()
+
+	services, err := clientset.CoreV1().Services("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+
+	for _, service := range services.Items {
+		// print(service.Name)
+		common.SysLog(fmt.Sprintf("service name: %s\n", service.Name))
+		for _, port := range service.Spec.Ports {
+
+			if port.NodePort == targetPort {
+				// fmt.Printf("Service %s in namespace %s is using port %d\n", service.Name, service.Namespace, checkPort)
+				common.SysLog(fmt.Sprintf("Service %s in namespace %s is using port %d\n", service.Name, service.Namespace, targetPort))
+				return false
+			}
+		}
+	}
 	return true
 }
 
 func getAvailablePorts(l int32, r int32, cnt int) []int32 {
 	ret := make([]int32, 0)
-	ok := 1
+	ok := 0
 	for i := l; i < r && ok < cnt; i++ {
 		if checkPort(i) {
 			ret = append(ret, i)
@@ -120,9 +138,11 @@ func getAvailablePorts(l int32, r int32, cnt int) []int32 {
 
 func GetServicePorts(pod Pod) []apiv1.ServicePort {
 	forwardPorts := getAvailablePorts(30000, 40000, len(pod.Ports))
+	common.SysLog(fmt.Sprintf("forwardPorts: %v\n", forwardPorts))
 	ports := make([]apiv1.ServicePort, len(pod.Ports))
 	for i, port := range pod.Ports {
 		ports[i] = apiv1.ServicePort{
+			Name:       fmt.Sprintf("from%vto%v", port, forwardPorts[i]),
 			Port:       int32(port),
 			TargetPort: intstr.FromInt32(port),
 			NodePort:   int32(forwardPorts[i]),
@@ -176,34 +196,62 @@ func NewService(pod Pod) error {
 	}
 
 	namespace := pod.NameSpace
-	statefulSetClient := clientset.AppsV1().StatefulSets(namespace) // 更新为 AppsV1
-	serviceClient := clientset.CoreV1().Services(namespace)
+
+	statefulSetClient := clientset.AppsV1().StatefulSets(namespace)
 	ss, svc := newStatefulSetAndService(pod)
 
-	common.SysLog("Creating StatefulSet...")
+	common.SysLog("Checking if StatefulSet exists...")
+	existSts, err := statefulSetClient.Get(context.TODO(), ss.Name, metav1.GetOptions{})
 
-	resultSts, err := statefulSetClient.Create(context.TODO(), ss, metav1.CreateOptions{})
-	if err != nil {
-		common.SysLog(err.Error())
-		return err
-		// panic(err)
+	if err == nil {
+		common.SysLog(fmt.Sprintf("StatefulSet %s already exists, deleting...", existSts.Name))
+		err := statefulSetClient.Delete(context.TODO(), ss.Name, metav1.DeleteOptions{})
+		if err != nil {
+			common.SysLog(err.Error())
+			return err
+		} else {
+			info := fmt.Sprintf("Deleted StatefulSet %q.\n", existSts.GetObjectMeta().GetName())
+			common.SysLog(info)
+		}
 	}
+
 	{
-		info := fmt.Sprintf("Created StatefulSet %q.\n", resultSts.GetObjectMeta().GetName())
-		common.SysLog(info)
+		common.SysLog("Creating StatefulSet...")
+		resultSts, err := statefulSetClient.Create(context.TODO(), ss, metav1.CreateOptions{})
+		if err != nil {
+			common.SysLog(err.Error())
+			return err
+		} else {
+			info := fmt.Sprintf("Created StatefulSet %q.\n", resultSts.GetObjectMeta().GetName())
+			common.SysLog(info)
+		}
 	}
 
-	common.SysLog("Creating service...")
-
-	resultSvc, err := serviceClient.Create(context.TODO(), svc, metav1.CreateOptions{})
-	if err != nil {
-		common.SysLog(err.Error())
-		return err
+	common.SysLog("Checking service...")
+	serviceClient := clientset.CoreV1().Services(namespace)
+	exsitSvc, err := clientset.CoreV1().Services(namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	if err == nil {
+		common.SysLog(fmt.Sprintf("service %s already exists, deleting ...", exsitSvc.Name))
+		err := clientset.CoreV1().Services(namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+		if err != nil {
+			common.SysLog(err.Error())
+			return err
+		} else {
+			info := fmt.Sprintf("Deleted service %q.\n", exsitSvc.GetObjectMeta().GetName())
+			common.SysLog(info)
+		}
 	}
+
 	{
-		info := fmt.Sprintf("Created service %q.\n", resultSvc.GetObjectMeta().GetName())
-		common.SysLog(info)
+		common.SysLog("creating service ...")
+		resultSvc, err := serviceClient.Create(context.TODO(), svc, metav1.CreateOptions{})
+		if err != nil {
+			common.SysLog(err.Error())
+			return err
+		} else {
+			info := fmt.Sprintf("Created service %q.\n", resultSvc.GetObjectMeta().GetName())
+			common.SysLog(info)
+		}
 	}
-
 	return nil
 }
