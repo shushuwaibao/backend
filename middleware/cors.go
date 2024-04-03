@@ -9,5 +9,6 @@ func CORS() gin.HandlerFunc {
 	config := cors.DefaultConfig()
 	// config.AllowOrigins = []string{"https://gin-template.vercel.app", "http://localhost:3000/"}
 	config.AllowAllOrigins = true
+	config.AllowCredentials = true
 	return cors.New(config)
 }
