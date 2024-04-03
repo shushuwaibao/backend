@@ -9,7 +9,7 @@ import (
 
 type UserContainer struct {
 	ID           int       `gorm:"primaryKey" json:"id"`
-	Label        string    `gorm:"size:255" json:"label"`
+	Label        string    `gorm:"size:255 unique" json:"label"`
 	Namespace    string    `gorm:"type:char(36)" json:"namespace"`
 	ConfigID     int       `gorm:"type:char(36)" json:"configId"`
 	UserID       int       `gorm:"type:char(36)" json:"userId"`
@@ -96,9 +96,9 @@ func GetUserContainerByID(id int) (*UserContainer, error) {
 	return &container, err
 }
 
-func GetALLUserContainerByUserID(userID string) ([]UserContainer, error) {
+func GetALLUserContainerByUserID(userID int) ([]UserContainer, error) {
 	var containers []UserContainer
-	err := DB.Where("user_id = ?", userID).Find(&containers).Error
+	err := DB.Where("UserID = ?", userID).Find(&containers).Error
 	return containers, err
 }
 
@@ -208,10 +208,32 @@ func TestInstancev2(podconfig k8s.PodConfig) error {
 }
 
 func SetUserContainerStatus(id int, status string) error {
-	return DB.Model(&UserContainer{}).Where("id = ?", id).Update("status", status).Error
+	// update status and last boot time(if status is setting to running
+
+	// 1. get the container
+	container, err := GetUserContainerByID(id)
+	if err != nil {
+		return err
+	}
+
+	// 2. update the status
+	container.Status = status
+	if status == "running" {
+		container.LastBoot = time.Now()
+	}
+
+	// 3. save the container
+	return DB.Save(container).Error
 }
 
 func SaveCreateConfig(podConfig k8s.PodConfig, userid int) (int, error) {
+	// check weahter the label is unique
+	var count int64
+	DB.Model(&UserContainer{}).Where("label = ?", podConfig.Name).Count(&count)
+	if count > 0 {
+		return -1, fmt.Errorf("label %s is not unique", podConfig.Name)
+	}
+
 	// 创建UserContainer记录
 	userContainer := UserContainer{
 		Label:     podConfig.Name,
