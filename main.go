@@ -58,6 +58,12 @@ func main() {
 		server.Use(sessions.Sessions("session", store))
 	} else {
 		store := cookie.NewStore([]byte(common.SessionSecret))
+    store.Options(sessions.Options{
+        Path:     "/",
+        MaxAge:   86400 * 7, // Adjust based on your requirements
+        Secure:   false, // Ensure cookies are sent over HTTPS
+        HttpOnly: true, // Protect cookies from being accessed through client-side scripts
+    })
 		server.Use(sessions.Sessions("session", store))
 	}
 
