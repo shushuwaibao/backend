@@ -1,11 +1,3 @@
-FROM node:16 as builder
-
-WORKDIR /build
-COPY ./web .
-COPY ./VERSION .
-RUN npm install
-RUN REACT_APP_VERSION=$(cat VERSION) npm run build
-
 FROM golang AS builder2
 
 ENV GO111MODULE=on \
@@ -14,7 +6,6 @@ ENV GO111MODULE=on \
 
 WORKDIR /build
 COPY . .
-COPY --from=builder /build/build ./web/build
 RUN go mod download
 RUN go build -ldflags "-s -w -X 'gin-template/common.Version=$(cat VERSION)' -extldflags '-static'" -o gin-template
 
