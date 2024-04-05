@@ -14,9 +14,9 @@ type UserContainer struct {
 	ConfigID     int       `gorm:"type:char(36)" json:"configId"`
 	UserID       int       `gorm:"type:char(36)" json:"userId"`
 	ImageID      int       `gorm:"type:char(36)" json:"imageId"`
-	CreatedAt    time.Time `gorm:"not null" json:"createdAt"`
-	TotalRuntime int       `gorm:"type:int" json:"totalRuntime"`
-	LastBoot     time.Time `gorm:"not null" json:"lastBoot"`
+	CreatedAt    time.Time `gorm:"type:datetime(3)" json:"createdAt"`
+	TotalRuntime uint64    `gorm:"type:int" json:"totalRuntime"`
+	LastBoot     time.Time `gorm:"type:datetime(3)" json:"lastBoot"`
 	StartCMD     string    `gorm:"size:255" json:"startCmd"`
 	Status       string    `gorm:"size:255" json:"status"`
 	Envs         string    `gorm:"type:json" json:"envs"`
@@ -96,9 +96,9 @@ func GetUserContainerByID(id int) (*UserContainer, error) {
 	return &container, err
 }
 
-func GetALLUserContainerByUserID(userID int) ([]UserContainer, error) {
+func GetUserContainerByUserID(userID int) ([]UserContainer, error) {
 	var containers []UserContainer
-	err := DB.Where("UserID = ?", userID).Find(&containers).Error
+	err := DB.Where("user_id = ?", userID).Find(&containers).Error
 	return containers, err
 }
 
@@ -139,36 +139,7 @@ func GetConfigByID(id int) (*ContainerConfig, error) {
 	return &config, err
 }
 
-// 不知道返回啥还，反正报错肯定要返回,所以暂时就返回一个报错了
-func CreateInstance(conf *InstanceConfig) error {
-	podconf := instanceConfigToPodInfo(conf)
-	return k8s.NewService(podconf)
-}
-
-// func TestInstance(pod k8s.Pod) error {
-// 	if pod.Rescourses.Volumes == nil {
-// 		pod.Rescourses.Volumes = make([]k8s.Storage, 0)
-// 		pod.Rescourses.Volumes = append(pod.Rescourses.Volumes, k8s.Storage{
-// 			PVCName:      fmt.Sprint("pvc-", pod.Name),
-// 			RomLimit:     "15Gi",
-// 			MountPath:    "/home/default",
-// 			AccessMode:   "ReadWriteOnce",
-// 			StorageClass: "nfs-storage",
-// 		})
-// 	}
-
-// 	// fmt.Print(pod.Marshal()
-// 	{
-// 		// print pod to debug
-// 		data, _ := json.Marshal(pod)
-// 		fmt.Println(string(data))
-// 	}
-
-// 	return k8s.NewService(pod)
-// }
-
 func TestInstancev2(podconfig k8s.PodConfig) error {
-
 	var pod k8s.Pod
 
 	pod.Name = podconfig.Name
@@ -272,4 +243,26 @@ func SaveCreateConfig(podConfig k8s.PodConfig, userid int) (int, error) {
 	}
 
 	return userContainer.ID, nil
+}
+
+func GetInstanceName(uid int, iid int) ([]string, error) {
+	if GetRight(uid, iid) == 0 {
+		return nil, fmt.Errorf("No rights")
+	} else {
+		var results []struct {
+			Label     string
+			Namespace string
+		}
+		if err := DB.Table("user_containers").Select("label", "namespace").Where("id = ?", iid).Find(&results).Error; err != nil {
+			return nil, err
+		} else {
+			if len(results) == 0 {
+				return nil, fmt.Errorf("No such instance")
+			} else if len(results) > 1 {
+				return nil, fmt.Errorf("More than one instance found")
+			} else {
+				return []string{results[0].Label, results[0].Namespace}, nil
+			}
+		}
+	}
 }
