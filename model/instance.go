@@ -25,18 +25,6 @@ type UserContainer struct {
 	Service      string    `gorm:"type:json" json:"service"`
 }
 
-type StorageInfo struct {
-	ID           int    `gorm:"primaryKey" json:"id"`
-	ContainerID  int    `gorm:"int" json:"containerId"` // 应该改为pvcname,我先不处理 处理牛魔，没这个你怎么知道这是哪个容器的
-	PVCName      string `gorm:"size:255" json:"pvcName"`
-	StorageClass string `gorm:"size:255" json:"storageClass"`
-	AccessMode   string `gorm:"size:255" json:"accessMode"`
-	Type         string `gorm:"size:255" json:"type"`
-	Size         string `gorm:"size:255" json:"size"` // 单位为G
-	Path         string `gorm:"size:255" json:"path"`
-	NodeID       int    `gorm:"int" json:"nodeId"`
-}
-
 type ContainerConfig struct {
 	ConfigID    int     `gorm:"primaryKey" json:"configId"`
 	Name        string  `gorm:"size:255" json:"name"`

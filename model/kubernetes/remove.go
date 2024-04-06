@@ -15,16 +15,13 @@ func RemoveStatefulSet(name string, namespace string) error {
 		common.SysLog(err.Error())
 		return err
 	}
-	_, err = clientset.AppsV1().StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-
-	if err == nil {
-		err := clientset.AppsV1().StatefulSets(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
-		return err
-	} else {
-		return err
+	err = clientset.AppsV1().StatefulSets(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err != nil {
+		common.SysLog(err.Error())
 	}
+	return err
 }
 
 func RemovePVC(name string) error {
-	
+
 }
