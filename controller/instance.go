@@ -13,12 +13,78 @@ import (
 
 func StartInstanceByInstanceID(c *gin.Context) {
 	// 传入一个id，根据id启动一个实例
+	userID, exists := c.Get("id")
+	if !exists {
+		// 如果不存在，可能是因为用户未认证
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	// var instanceID int
+	var instanceID struct {
+		Iid int `json:"iid"`
+	}
+	err := c.ShouldBindJSON(&instanceID)
+	if err != nil {
+		//没有传入iid
+		common.SysError(fmt.Sprintf("error: %v, val", err, instanceID.Iid))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	strs, err := model.GetInstanceName(userID.(int), instanceID.Iid)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Get instance Error", "info": err.Error()})
+		return
+	}
+	err = k8s.ChangeReplicas(strs[0], strs[1], 1)
 
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Start instance Error", "info": err.Error()})
+		return
+	}
+
+	err = model.SetUserContainerStatus(instanceID.Iid, "running")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Save status Error", "info": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"info": "successfully started instance"})
 }
 
 func StopInstanceByInstanceID(c *gin.Context) {
 	// 传入一个id，根据id停止一个实例
+	userID, exists := c.Get("id")
+	if !exists {
+		// 如果不存在，可能是因为用户未认证
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	var instanceID struct {
+		Iid int `json:"iid"`
+	}
+	err := c.ShouldBindJSON(&instanceID)
+	if err != nil {
+		common.SysError(fmt.Sprintf("error: %v, val", err, instanceID.Iid))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	strs, err := model.GetInstanceName(userID.(int), instanceID.Iid)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Get instance Error", "info": err.Error()})
+		return
+	}
+	err = k8s.ChangeReplicas(strs[0], strs[1], 0)
 
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Stop instance Error", "info": err.Error()})
+		return
+	}
+
+	err = model.SetUserContainerStatus(instanceID.Iid, "stop")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Save status Error", "info": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"info": "successfully stop instance"})
 }
 
 func RemoveInstancerByInstanceID(c *gin.Context) {
@@ -26,42 +92,7 @@ func RemoveInstancerByInstanceID(c *gin.Context) {
 
 }
 
-// func CreateInstanceConfigAndStart(c *gin.Context) {
-// 	// 传入一个配置并启动
-// 	// 传入的配置是一个json，包含了实例的配置信息，格式未定，按照需要加键值对
-// 	common.SysLog("receive a request creating instance")
-// 	var podconf k8s.Pod
-// 	err := c.ShouldBindJSON(&podconf)
-// 	if err != nil {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-// 		return
-// 	}
-// 	common.SysLog("conifg binded")
-
-// 	err = model.TestInstance(podconf)
-// 	if err == nil {
-// 		c.JSON(http.StatusAccepted, gin.H{"info": "successfully created service"})
-// 	} else {
-// 		c.String(http.StatusBadRequest, err.Error())
-// 	}
-// }
-
-func CreateInstanceConfigAndStartv3(c *gin.Context) {
-	/*
-
-		{
-		  "name": "test-api",
-		  "namespace": "default",
-		  "img_id": 1,
-		  "resources": {
-				"config_id" : 1,
-				"default_volume_size": "15Gi"
-				"Ports": [3389:22222]
-		  }
-		}
-
-
-	*/
+func CreateInstance(c *gin.Context) {
 	userID, exists := c.Get("id")
 	if !exists {
 		// 如果不存在，可能是因为用户未认证
@@ -72,7 +103,7 @@ func CreateInstanceConfigAndStartv3(c *gin.Context) {
 	var podconf k8s.PodConfig
 	err := c.ShouldBindJSON(&podconf)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	common.SysLog("conifg binded")
@@ -81,11 +112,11 @@ func CreateInstanceConfigAndStartv3(c *gin.Context) {
 	common.SysLog("config name: " + podconf.Name)
 	cid, err := model.SaveCreateConfig(podconf, userID.(int))
 	if err != nil {
-		c.String(http.StatusBadRequest, err.Error())
+		c.String(http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	err = model.TestInstancev2(podconf)
+	err = model.CreateService(podconf)
 	if err == nil {
 		err = model.SetUserContainerStatus(cid, "running")
 		if err != nil {
@@ -113,7 +144,7 @@ func ListAllInstance(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-	instances, err := model.GetALLUserContainerByUserID(userID.(int))
+	instances, err := model.GetUserContainerByUserID(userID.(int))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 		return

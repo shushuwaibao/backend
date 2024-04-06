@@ -77,6 +77,14 @@ func InitDB() (err error) {
 		if err != nil {
 			return err
 		}
+		err = db.AutoMigrate(&StorageContainerBind{})
+		if err != nil {
+			return err
+		}
+		err = db.AutoMigrate(&UserPVCShare{})
+		if err != nil {
+			return err
+		}
 		err = db.AutoMigrate(&ImageConfig{})
 		if err != nil {
 			return err
