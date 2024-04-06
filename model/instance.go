@@ -35,7 +35,6 @@ type ContainerConfig struct {
 	Price       float64 `gorm:"type:float" json:"price"`
 }
 
-
 func GetUserContainerByID(id int) (*UserContainer, error) {
 	var container UserContainer
 	err := DB.First(&container, id).Error
@@ -47,7 +46,6 @@ func GetUserContainerByUserID(userID int) ([]UserContainer, error) {
 	err := DB.Where("user_id = ?", userID).Find(&containers).Error
 	return containers, err
 }
-
 
 func GetAvailableInstanceConfig() ([]ContainerConfig, error) {
 	var configs []ContainerConfig
@@ -163,6 +161,24 @@ func SaveCreateConfig(podConfig k8s.PodConfig, userid int) (int, error) {
 	// 保存StorageInfo到数据库
 	if err := DB.Create(&storageInfo).Error; err != nil {
 		return -1, fmt.Errorf("failed to create storage info: %w", err)
+	}
+
+	acl := PVCACL{
+		StorageID:    storageInfo.ID,
+		SharedUserID: userid,
+		Permission:   "admin",
+	}
+	if err := DB.Create(&acl).Error; err != nil {
+		return -1, fmt.Errorf("failed to create pvc acl: %w", err)
+	}
+
+	binding := StorageContainerBind{
+		StorageID:   storageInfo.ID,
+		ContainerID: userContainer.ID,
+		MountPath:   "/home/default",
+	}
+	if err := DB.Create(&binding).Error; err != nil {
+		return -1, fmt.Errorf("failed to create storage container bind: %w", err)
 	}
 
 	return userContainer.ID, nil
