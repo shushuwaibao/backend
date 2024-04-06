@@ -3,6 +3,7 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"gin-template/common"
 	k8s "gin-template/model/kubernetes"
 	"time"
 )
@@ -179,21 +180,22 @@ func TestInstancev2(podconfig k8s.PodConfig) error {
 }
 
 func SetUserContainerStatus(id int, status string) error {
-	// update status and last boot time(if status is setting to running
-
-	// 1. get the container
 	container, err := GetUserContainerByID(id)
 	if err != nil {
 		return err
 	}
 
-	// 2. update the status
-	container.Status = status
-	if status == "running" {
-		container.LastBoot = time.Now()
+	if container.Status != status {
+		if status == "running" {
+			container.LastBoot = time.Now()
+		} else {
+			container.TotalRuntime += uint64(time.Now().Sub(container.LastBoot).Seconds())
+			container.LastBoot = time.Now()
+		}
 	}
 
-	// 3. save the container
+	container.Status = status
+
 	return DB.Save(container).Error
 }
 
@@ -246,6 +248,7 @@ func SaveCreateConfig(podConfig k8s.PodConfig, userid int) (int, error) {
 }
 
 func GetInstanceName(uid int, iid int) ([]string, error) {
+	common.SysLog(fmt.Sprintf("uid: %d, iid: %d", uid, iid))
 	if GetRight(uid, iid) == 0 {
 		return nil, fmt.Errorf("No rights")
 	} else {
@@ -264,5 +267,6 @@ func GetInstanceName(uid int, iid int) ([]string, error) {
 				return []string{results[0].Label, results[0].Namespace}, nil
 			}
 		}
+
 	}
 }

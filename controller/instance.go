@@ -19,14 +19,18 @@ func StartInstanceByInstanceID(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-	var instanceID int
+	// var instanceID int
+	var instanceID struct {
+		Iid int `json:"iid"`
+	}
 	err := c.ShouldBindJSON(&instanceID)
 	if err != nil {
 		//没有传入iid
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		common.SysError(fmt.Sprintf("error: %v, val", err, instanceID.Iid))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	strs, err := model.GetInstanceName(userID.(int), instanceID)
+	strs, err := model.GetInstanceName(userID.(int), instanceID.Iid)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Get instance Error", "info": err.Error()})
 		return
@@ -38,6 +42,11 @@ func StartInstanceByInstanceID(c *gin.Context) {
 		return
 	}
 
+	err = model.SetUserContainerStatus(instanceID.Iid, "running")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Save status Error", "info": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"info": "successfully started instance"})
 }
 
@@ -49,14 +58,16 @@ func StopInstanceByInstanceID(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-	var instanceID int
+	var instanceID struct {
+		Iid int `json:"iid"`
+	}
 	err := c.ShouldBindJSON(&instanceID)
 	if err != nil {
-		//没有传入iid
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		common.SysError(fmt.Sprintf("error: %v, val", err, instanceID.Iid))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	strs, err := model.GetInstanceName(userID.(int), instanceID)
+	strs, err := model.GetInstanceName(userID.(int), instanceID.Iid)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Get instance Error", "info": err.Error()})
 		return
@@ -68,6 +79,11 @@ func StopInstanceByInstanceID(c *gin.Context) {
 		return
 	}
 
+	err = model.SetUserContainerStatus(instanceID.Iid, "stop")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Save status Error", "info": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"info": "successfully started instance"})
 }
 
@@ -87,7 +103,7 @@ func CreateInstanceConfigAndStartv3(c *gin.Context) {
 	var podconf k8s.PodConfig
 	err := c.ShouldBindJSON(&podconf)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	common.SysLog("conifg binded")
@@ -96,7 +112,7 @@ func CreateInstanceConfigAndStartv3(c *gin.Context) {
 	common.SysLog("config name: " + podconf.Name)
 	cid, err := model.SaveCreateConfig(podconf, userID.(int))
 	if err != nil {
-		c.String(http.StatusBadRequest, err.Error())
+		c.String(http.StatusInternalServerError, err.Error())
 		return
 	}
 
