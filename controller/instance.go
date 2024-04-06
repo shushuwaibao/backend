@@ -84,7 +84,7 @@ func StopInstanceByInstanceID(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Save status Error", "info": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"info": "successfully started instance"})
+	c.JSON(http.StatusOK, gin.H{"info": "successfully stop instance"})
 }
 
 func RemoveInstancerByInstanceID(c *gin.Context) {
@@ -92,7 +92,7 @@ func RemoveInstancerByInstanceID(c *gin.Context) {
 
 }
 
-func CreateInstanceConfigAndStartv3(c *gin.Context) {
+func CreateInstance(c *gin.Context) {
 	userID, exists := c.Get("id")
 	if !exists {
 		// 如果不存在，可能是因为用户未认证
@@ -116,7 +116,7 @@ func CreateInstanceConfigAndStartv3(c *gin.Context) {
 		return
 	}
 
-	err = model.TestInstancev2(podconf)
+	err = model.CreateService(podconf)
 	if err == nil {
 		err = model.SetUserContainerStatus(cid, "running")
 		if err != nil {

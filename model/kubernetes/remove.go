@@ -22,6 +22,6 @@ func RemoveStatefulSet(name string, namespace string) error {
 	return err
 }
 
-func RemovePVC(name string) error {
+// func RemovePVC(name string) error {
 
-}
+// }
