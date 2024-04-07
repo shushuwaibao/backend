@@ -22,7 +22,7 @@ const (
 	mainPage = "index.html"
 )
 
-//go:embed frontend/dist/*
+//go:embed dist/*
 var fs embed.FS
 
 func StartRDPService(r *gin.Engine) {
@@ -57,7 +57,11 @@ func ParseUrl(urlPrefix string) gin.HandlerFunc {
 		}
 
 		fi, err := f.Stat()
-		if err != nil || !fi.IsDir() {
+		if err != nil {
+			return
+		}
+
+		if !fi.IsDir() {
 			bs, err := fs.ReadFile(urlPath)
 			if err != nil {
 				logrus.WithError(err).Error("embed fs")
