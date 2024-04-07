@@ -4,6 +4,7 @@ import (
 	"gin-template/common"
 	"gin-template/middleware"
 	"gin-template/model"
+	"gin-template/rdp"
 	"gin-template/router"
 	"log"
 	"os"
@@ -76,4 +77,6 @@ func main() {
 	if err != nil {
 		log.Println(err)
 	}
+
+	rdp.StartRDPService(server)
 }
