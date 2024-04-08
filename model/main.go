@@ -81,7 +81,7 @@ func InitDB() (err error) {
 		if err != nil {
 			return err
 		}
-		err = db.AutoMigrate(&UserPVCShare{})
+		err = db.AutoMigrate(&PVCACL{})
 		if err != nil {
 			return err
 		}

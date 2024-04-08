@@ -103,17 +103,18 @@ func SetUserContainerStatus(id int, status string) error {
 	if err != nil {
 		return err
 	}
-
-	if container.Status != status {
+	if container.Status == "removed" {
+		// removed
+		return fmt.Errorf("container has been removed")
+	} else if container.Status != status {
 		if status == "running" {
 			container.LastBoot = time.Now()
 		} else {
 			container.TotalRuntime += uint64(time.Now().Sub(container.LastBoot).Seconds())
 			container.LastBoot = time.Now()
 		}
+		container.Status = status
 	}
-
-	container.Status = status
 
 	return DB.Save(container).Error
 }
@@ -164,9 +165,9 @@ func SaveCreateConfig(podConfig k8s.PodConfig, userid int) (int, error) {
 	}
 
 	acl := PVCACL{
-		StorageID:    storageInfo.ID,
-		SharedUserID: userid,
-		Permission:   "admin",
+		StorageID:  storageInfo.ID,
+		UserID:     userid,
+		Permission: "admin",
 	}
 	if err := DB.Create(&acl).Error; err != nil {
 		return -1, fmt.Errorf("failed to create pvc acl: %w", err)

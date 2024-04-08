@@ -1,9 +1,9 @@
 package model
 
 type PVCACL struct {
-	StorageID    int    `gorm:"type:int;primaryKey" json:"storageId"`
-	SharedUserID int    `gorm:"type:int;primaryKey" json:"sharedUserId"`
-	Permission   string `gorm:"size:255" json:"permission"` // read(only the rdp session), write(modify), admin(delete)
+	StorageID  int    `gorm:"type:int;primaryKey" json:"storageId"`
+	UserID     int    `gorm:"type:int;primaryKey" json:"UserId"`
+	Permission string `gorm:"size:255" json:"permission"` // read(only the rdp session), write(modify), admin(delete)
 }
 
 type StorageContainerBind struct {
@@ -20,4 +20,76 @@ type StorageInfo struct {
 	Type         string `gorm:"size:255" json:"type"` // 存储类型，例如nfs
 	Size         string `gorm:"size:255" json:"size"` // 存储空间大小，如4Gi
 	NodeID       int    `gorm:"int" json:"nodeId"`
+}
+
+func GetStorageInfo(storageID int) (StorageInfo, error) {
+	var storageInfo StorageInfo
+	result := DB.Table("storage_info").First(&storageInfo, storageID)
+	return storageInfo, result.Error
+}
+
+func ListBindedStorage(containerID int) ([]int, error) {
+	var storageContainerBinds []StorageContainerBind
+	result := DB.Table("storage_container_bind").Where("container_id = ?", containerID).Find(&storageContainerBinds)
+	var storageIDs []int
+	for _, bind := range storageContainerBinds {
+		storageIDs = append(storageIDs, bind.StorageID)
+	}
+	return storageIDs, result.Error
+}
+
+func ListAdminPVC(UserID int) ([]int, error) {
+	var pvcACLs []PVCACL
+	result := DB.Table("pvc_acl").Where("shared_user_id = ? AND permission = ?", UserID, "admin").Find(&pvcACLs)
+	// result := DB.Where("shared_user_id = ? AND permission = ?", UserID, "admin").Find(&pvcACLs)
+	var storageIDs []int
+	for _, pvcACL := range pvcACLs {
+		storageIDs = append(storageIDs, pvcACL.StorageID)
+	}
+	return storageIDs, result.Error
+}
+
+func ListOnlyBindedPVC(userID int, containerID int) ([]StorageInfo, error) {
+	var storageContainerBinds []StorageContainerBind
+	result := DB.Table("storage_container_bind").Where("container_id = ?", containerID).Find(&storageContainerBinds)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	admin, err := ListAdminPVC(userID)
+	if err != nil {
+		return nil, err
+	}
+	binds, err := ListBindedStorage(containerID)
+	if err != nil {
+		return nil, err
+	}
+	// 取admin 和binds 的交集
+	vis := make(map[int]bool)
+	for _, v := range admin {
+		vis[v] = true
+	}
+	var rem []int
+	for _, v := range binds {
+		if vis[v] {
+			rem = append(rem, v)
+		}
+	}
+
+	var res []StorageInfo
+	for _, bind := range rem {
+		//检查在db中是否只有一条bind
+		var tmp []StorageInfo
+		err = DB.Table("storage_container_bind").Where("container_id = ? AND storage_id = ?", containerID, bind).Find(&tmp).Error
+		if err != nil {
+			return nil, err
+		}
+		if len(tmp) == 1 {
+			storageInfo, err := GetStorageInfo(bind)
+			if err != nil {
+				return nil, err
+			}
+			res = append(res, storageInfo)
+		}
+	}
+	return res, nil
 }

@@ -22,6 +22,20 @@ func RemoveStatefulSet(name string, namespace string) error {
 	return err
 }
 
+func RemoveService(name string, namespace string) error {
+	config := GetConf()
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		common.SysLog(err.Error())
+		return err
+	}
+	err = clientset.CoreV1().Services(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err != nil {
+		common.SysLog(err.Error())
+	}
+	return err
+}
+
 func RemovePVC(name string) error {
 	config := GetConf()
 	clientset, err := kubernetes.NewForConfig(config)
