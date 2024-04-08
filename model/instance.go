@@ -21,7 +21,8 @@ type UserContainer struct {
 	StartCMD     string    `gorm:"size:255" json:"startCmd"`
 	Status       string    `gorm:"size:255" json:"status"`
 	Envs         string    `gorm:"type:json" json:"envs"`
-	Ports        string    `gorm:"type:json" json:"ports"`
+	SSHport      int       `gorm:"type:int" json:"sshPort"`
+	RDPport      int    `gorm:"type:int" json:"rdpPort"`
 	Service      string    `gorm:"type:json" json:"service"`
 }
 
