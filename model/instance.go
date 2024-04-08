@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"gin-template/common"
 	k8s "gin-template/model/kubernetes"
+	guac "gin-template/rdp/guac"
+	"os"
 	"time"
 )
 
@@ -21,7 +23,8 @@ type UserContainer struct {
 	StartCMD     string    `gorm:"size:255" json:"startCmd"`
 	Status       string    `gorm:"size:255" json:"status"`
 	Envs         string    `gorm:"type:json" json:"envs"`
-	Ports        string    `gorm:"type:json" json:"ports"`
+	SSHport      int       `gorm:"type:int" json:"sshPort"`
+	RDPport      int       `gorm:"type:int" json:"rdpPort"`
 	Service      string    `gorm:"type:json" json:"service"`
 }
 
@@ -35,7 +38,6 @@ type ContainerConfig struct {
 	Price       float64 `gorm:"type:float" json:"price"`
 }
 
-
 func GetUserContainerByID(id int) (*UserContainer, error) {
 	var container UserContainer
 	err := DB.First(&container, id).Error
@@ -47,7 +49,6 @@ func GetUserContainerByUserID(userID int) ([]UserContainer, error) {
 	err := DB.Where("user_id = ?", userID).Find(&containers).Error
 	return containers, err
 }
-
 
 func GetAvailableInstanceConfig() ([]ContainerConfig, error) {
 	var configs []ContainerConfig
@@ -140,7 +141,8 @@ func SaveCreateConfig(podConfig k8s.PodConfig, userid int) (int, error) {
 		StartCMD:  "",     // 根据需要设置
 		Status:    "stop", // 假设新创建的容器初始状态为running
 		Envs:      "{}",   // Envs, Ports, Service等字段根据PodConfig设置
-		Ports:     "{}",
+		SSHport:   0,
+		RDPport:   0,
 		Service:   "{}",
 		// Envs, Ports, Service等字段根据PodConfig设置
 	}
@@ -190,4 +192,24 @@ func GetInstanceName(uid int, iid int) ([]string, error) {
 		}
 
 	}
+}
+
+func GetGuacdInfo(basearg guac.ReqArgBaseInfo, uid int) (guac.ReqArg, error) {
+	reqarg := new(guac.ReqArg)
+	reqarg.AssetUser = basearg.AssetUser
+	reqarg.AssetPassword = basearg.AssetPassword
+	// get rdp port from db
+	var container UserContainer
+	if err := DB.Where("id = ?", basearg.InstanceID).First(&container).Error; err != nil {
+		return *reqarg, err
+	}
+	reqarg.AssetPort = fmt.Sprint(container.RDPport)
+	reqarg.AssetHost = "172.16.13.73"
+	reqarg.AssetProtocol = "rdp"
+	reqarg.GuacadAddr = os.Getenv("GUACD_URL")
+	reqarg.ScreenHeight = 1080
+	reqarg.ScreenWidth = 1920
+	reqarg.ScreenDpi = 300
+
+	return *reqarg, nil
 }

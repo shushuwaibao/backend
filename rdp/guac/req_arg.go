@@ -1,5 +1,11 @@
 package guac
 
+type ReqArgBaseInfo struct {
+	AssetUser     string `form:"asset_user"`
+	AssetPassword string `form:"asset_password"`
+	InstanceID    string `form:"instance_id"`
+}
+
 type ReqArg struct {
 	GuacadAddr    string `form:"guacad_addr"`
 	AssetProtocol string `form:"asset_protocol"`
