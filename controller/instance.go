@@ -37,7 +37,7 @@ func CreateInstance(c *gin.Context) {
 
 	err = model.CreateService(podconf)
 	if err == nil {
-		err = model.FlashInstanceConfig(cid)
+		err = model.FlushInstanceConfig(cid)
 		// err = model.SetUserContainerStatus(cid, "running")
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "config successfully saved but service failed"})

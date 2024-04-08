@@ -227,7 +227,7 @@ func GetInstanceName(uid int, iid int) ([]string, error) {
 	}
 }
 
-func FlashInstanceConfig(cid int) error {
+func FlushInstanceConfig(cid int) error {
 	var container UserContainer
 	DB.Table("user_containers").Select("config_id").Where("id = ?", cid).First(&container)
 	// DB.First(&container, cid)
