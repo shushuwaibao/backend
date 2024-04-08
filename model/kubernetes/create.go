@@ -113,7 +113,6 @@ func checkPort(targetPort int32) bool {
 		// print(service.Name)
 		common.SysLog(fmt.Sprintf("service name: %s\n", service.Name))
 		for _, port := range service.Spec.Ports {
-
 			if port.NodePort == targetPort {
 				// fmt.Printf("Service %s in namespace %s is using port %d\n", service.Name, service.Namespace, checkPort)
 				common.SysLog(fmt.Sprintf("Service %s in namespace %s is using port %d\n", service.Name, service.Namespace, targetPort))

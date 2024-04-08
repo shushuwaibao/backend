@@ -20,6 +20,7 @@ type UserContainer struct {
 	LastBoot     time.Time `gorm:"type:datetime(3)" json:"lastBoot"`
 	StartCMD     string    `gorm:"size:255" json:"startCmd"`
 	Status       string    `gorm:"size:255" json:"status"`
+	ClusterIP    string    `gorm:"size:255" json:"clusterIP"`
 	Envs         string    `gorm:"type:json" json:"envs"`
 	Ports        string    `gorm:"type:json" json:"ports"`
 	Service      string    `gorm:"type:json" json:"service"`
@@ -97,12 +98,7 @@ func CreateService(podconfig k8s.PodConfig) error {
 
 	return k8s.NewService(pod)
 }
-
-func SetUserContainerStatus(id int, status string) error {
-	container, err := GetUserContainerByID(id)
-	if err != nil {
-		return err
-	}
+func updContainer(container *UserContainer, status string) error {
 	if container.Status == "removed" {
 		// removed
 		return fmt.Errorf("container has been removed")
@@ -114,15 +110,29 @@ func SetUserContainerStatus(id int, status string) error {
 			container.LastBoot = time.Now()
 		}
 		container.Status = status
+		return nil
+	} else {
+		return nil
 	}
+}
 
+func SetUserContainerStatus(id int, status string) error {
+	container, err := GetUserContainerByID(id)
+	if err != nil {
+		return err
+	}
+	err = updContainer(container, status)
+	if err != nil {
+		return err
+	}
 	return DB.Save(container).Error
 }
 
-func SaveCreateConfig(podConfig k8s.PodConfig, userid int) (int, error) {
+func CreateInstance(podConfig k8s.PodConfig, userid int) (int, error) {
 	// check weahter the label is unique
+	db := DB.Begin()
 	var count int64
-	DB.Model(&UserContainer{}).Where("label = ?", podConfig.Name).Count(&count)
+	db.Model(&UserContainer{}).Where("label = ?", podConfig.Name).Count(&count)
 	if count > 0 {
 		return -1, fmt.Errorf("label %s is not unique", podConfig.Name)
 	}
@@ -145,7 +155,8 @@ func SaveCreateConfig(podConfig k8s.PodConfig, userid int) (int, error) {
 	}
 
 	// 保存UserContainer到数据库
-	if err := DB.Create(&userContainer).Error; err != nil {
+	if err := db.Create(&userContainer).Error; err != nil {
+		db.Rollback()
 		return -1, fmt.Errorf("failed to create user container: %w", err)
 	}
 
@@ -160,7 +171,8 @@ func SaveCreateConfig(podConfig k8s.PodConfig, userid int) (int, error) {
 	}
 
 	// 保存StorageInfo到数据库
-	if err := DB.Create(&storageInfo).Error; err != nil {
+	if err := db.Create(&storageInfo).Error; err != nil {
+		db.Rollback()
 		return -1, fmt.Errorf("failed to create storage info: %w", err)
 	}
 
@@ -169,7 +181,8 @@ func SaveCreateConfig(podConfig k8s.PodConfig, userid int) (int, error) {
 		UserID:     userid,
 		Permission: "admin",
 	}
-	if err := DB.Create(&acl).Error; err != nil {
+	if err := db.Create(&acl).Error; err != nil {
+		db.Rollback()
 		return -1, fmt.Errorf("failed to create pvc acl: %w", err)
 	}
 
@@ -178,8 +191,13 @@ func SaveCreateConfig(podConfig k8s.PodConfig, userid int) (int, error) {
 		ContainerID: userContainer.ID,
 		MountPath:   "/home/default",
 	}
-	if err := DB.Create(&binding).Error; err != nil {
+	if err := db.Create(&binding).Error; err != nil {
+		db.Rollback()
 		return -1, fmt.Errorf("failed to create storage container bind: %w", err)
+	}
+
+	if err := db.Commit().Error; err != nil {
+		return -1, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return userContainer.ID, nil
@@ -207,4 +225,40 @@ func GetInstanceName(uid int, iid int) ([]string, error) {
 		}
 
 	}
+}
+
+func FlashInstanceConfig(cid int) error {
+	var container UserContainer
+	DB.Table("user_containers").Select("config_id").Where("id = ?", cid).First(&container)
+	// DB.First(&container, cid)
+	pod, err := k8s.GetSS(container.Label, container.Namespace)
+	if err != nil {
+		return err
+	}
+
+	// upd lifetime
+	if pod.Status.ReadyReplicas == 0 {
+		updContainer(&container, "stop")
+	} else if pod.Status.ReadyReplicas == 1 {
+		updContainer(&container, "running")
+	}
+
+	svc, err := k8s.GetService(container.Label, container.Namespace)
+	if err != nil {
+		return err
+	}
+	container.ClusterIP = svc.Spec.ClusterIP
+	// container.Service = fmt.Sprintf("%v:%v", svc.Spec.ClusterIP, svc.Spec.Ports[0].Port)
+	// container.Ports = json.Marshal(svc.Spec.Ports)
+	var ports []struct {
+		TargetPort  int32 `json:"targetPort"`
+		ForwardPort int32 `json:"forwardPort"`
+	}
+	portBytes, err := json.Marshal(ports)
+	if err != nil {
+		return err
+	}
+	container.Ports = string(portBytes)
+
+	return DB.Save(&container).Error
 }

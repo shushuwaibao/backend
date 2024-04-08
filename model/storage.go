@@ -1,9 +1,10 @@
 package model
 
-import {
+import (
 	"fmt"
 	k8s "gin-template/model/kubernetes"
-}
+)
+
 type PVCACL struct {
 	StorageID  int    `gorm:"type:int;primaryKey" json:"storageId"`
 	UserID     int    `gorm:"type:int;primaryKey" json:"UserId"`
@@ -34,7 +35,7 @@ func GetStorageInfo(storageID int) (StorageInfo, error) {
 
 func ListBindedStorage(containerID int) ([]int, error) {
 	var storageContainerBinds []StorageContainerBind
-	result := DB.Table("storage_container_bind").Where("container_id = ?", containerID).Find(&storageContainerBinds)
+	result := DB.Table("storage_container_bindss").Where("container_id = ?", containerID).Find(&storageContainerBinds)
 	var storageIDs []int
 	for _, bind := range storageContainerBinds {
 		storageIDs = append(storageIDs, bind.StorageID)
@@ -55,7 +56,7 @@ func ListAdminPVC(UserID int) ([]int, error) {
 
 func ListOnlyBindedPVC(userID int, containerID int) ([]StorageInfo, error) {
 	var storageContainerBinds []StorageContainerBind
-	result := DB.Table("storage_container_bind").Where("container_id = ?", containerID).Find(&storageContainerBinds)
+	result := DB.Table("storage_container_binds").Where("container_id = ?", containerID).Find(&storageContainerBinds)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -83,7 +84,7 @@ func ListOnlyBindedPVC(userID int, containerID int) ([]StorageInfo, error) {
 	for _, bind := range rem {
 		//检查在db中是否只有一条bind
 		var tmp []StorageInfo
-		err = DB.Table("storage_container_bind").Where("container_id = ? AND storage_id = ?", containerID, bind).Find(&tmp).Error
+		err = DB.Table("storage_container_binds").Where("container_id = ? AND storage_id = ?", containerID, bind).Find(&tmp).Error
 		if err != nil {
 			return nil, err
 		}
@@ -101,16 +102,16 @@ func ListOnlyBindedPVC(userID int, containerID int) ([]StorageInfo, error) {
 func DeleteStorageEntries(storage StorageInfo) error {
 	tx := DB.Begin()
 	if err := tx.Table("pvc_acl").Where("storage_id = ?", storage.ID).Delete(&PVCACL{}).Error; err != nil {
-		tx.Rollback() 
+		tx.Rollback()
 		return fmt.Errorf("failed to delete from PVCACL: %w", err)
 	}
 
-	if err := tx.Table("storage_container_bind").Where("storage_id = ?", storage.ID).Delete(&StorageContainerBind{}).Error; err != nil {
-		tx.Rollback() 
+	if err := tx.Table("storage_container_binds").Where("storage_id = ?", storage.ID).Delete(&StorageContainerBind{}).Error; err != nil {
+		tx.Rollback()
 		return fmt.Errorf("failed to delete from StorageContainerBind: %w", err)
 	}
-	
-	if err:= k8s.RemovePVC(storage.PVCName); err != nil{
+
+	if err := k8s.RemovePVC(storage.PVCName); err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to remove PVC: %w", err)
 	}
