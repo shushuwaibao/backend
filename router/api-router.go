@@ -3,6 +3,7 @@ package router
 import (
 	"gin-template/controller"
 	"gin-template/middleware"
+	"gin-template/rdp"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,7 +22,7 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/oauth/wechat", middleware.CriticalRateLimit(), controller.WeChatAuth)
 		apiRouter.GET("/oauth/wechat/bind", middleware.CriticalRateLimit(), middleware.UserAuth(), controller.WeChatBind)
 		apiRouter.GET("/oauth/email/bind", middleware.CriticalRateLimit(), middleware.UserAuth(), controller.EmailBind)
-		apiRouter.GET("/rdpws", middleware.UserAuth())
+		apiRouter.GET("/rdpws", middleware.UserAuth(), rdp.MakeConnection())
 
 		userRoute := apiRouter.Group("/user")
 		{
