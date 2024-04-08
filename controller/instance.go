@@ -166,8 +166,9 @@ func RemoveInstancerByInstanceID(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "List PVC Error", "info": err.Error()})
 		return
 	}
+
 	for _, pvc := range pvcs {
-		err = k8s.RemovePVC(pvc.PVCName)
+		err = model.DeleteStorageEntries(pvc)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Remove PVC Error", "info": err.Error()})
 			return
@@ -210,6 +211,5 @@ func GetAllAvailableInstanceConfig(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 		return
 	}
-
 	c.JSON(http.StatusOK, configs)
 }

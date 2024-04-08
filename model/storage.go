@@ -1,5 +1,9 @@
 package model
 
+import {
+	"fmt"
+	k8s "gin-template/model/kubernetes"
+}
 type PVCACL struct {
 	StorageID  int    `gorm:"type:int;primaryKey" json:"storageId"`
 	UserID     int    `gorm:"type:int;primaryKey" json:"UserId"`
@@ -92,4 +96,28 @@ func ListOnlyBindedPVC(userID int, containerID int) ([]StorageInfo, error) {
 		}
 	}
 	return res, nil
+}
+
+func DeleteStorageEntries(storage StorageInfo) error {
+	tx := DB.Begin()
+	if err := tx.Table("pvc_acl").Where("storage_id = ?", storage.ID).Delete(&PVCACL{}).Error; err != nil {
+		tx.Rollback() 
+		return fmt.Errorf("failed to delete from PVCACL: %w", err)
+	}
+
+	if err := tx.Table("storage_container_bind").Where("storage_id = ?", storage.ID).Delete(&StorageContainerBind{}).Error; err != nil {
+		tx.Rollback() 
+		return fmt.Errorf("failed to delete from StorageContainerBind: %w", err)
+	}
+	
+	if err:= k8s.RemovePVC(storage.PVCName); err != nil{
+		tx.Rollback()
+		return fmt.Errorf("failed to remove PVC: %w", err)
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return fmt.Errorf("transaction commit failed: %w", err)
+	}
+
+	return nil
 }

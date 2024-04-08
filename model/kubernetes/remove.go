@@ -47,5 +47,6 @@ func RemovePVC(name string) error {
 	if err != nil {
 		common.SysLog(err.Error())
 	}
+
 	return err
 }
