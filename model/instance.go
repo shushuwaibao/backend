@@ -23,7 +23,7 @@ type UserContainer struct {
 	ClusterIP    string    `gorm:"size:255" json:"clusterIP"`
 	Envs         string    `gorm:"type:json" json:"envs"`
 	Ports        string    `gorm:"type:json" json:"ports"`
-	Service      string    `gorm:"type:json" json:"service"`
+	Service      string    `gorm:"size:255" json:"service"`
 }
 
 type ContainerConfig struct {
@@ -191,9 +191,14 @@ func CreateInstance(podConfig k8s.PodConfig, userid int) (int, error) {
 		ContainerID: userContainer.ID,
 		MountPath:   "/home/default",
 	}
+
 	if err := db.Create(&binding).Error; err != nil {
 		db.Rollback()
 		return -1, fmt.Errorf("failed to create storage container bind: %w", err)
+	}
+	if err := CreateService(podConfig); err != nil {
+		db.Rollback()
+		return -1, fmt.Errorf("failed to create service: %w", err)
 	}
 
 	if err := db.Commit().Error; err != nil {
@@ -229,8 +234,14 @@ func GetInstanceName(uid int, iid int) ([]string, error) {
 
 func FlushInstanceConfig(cid int) error {
 	var container UserContainer
-	DB.Table("user_containers").Select("config_id").Where("id = ?", cid).First(&container)
-	// DB.First(&container, cid)
+	DB.Table("user_containers").Where("id = ?", cid).First(&container)
+
+	if container.Status == "removed" {
+		return nil
+		// removed
+		// return fmt.Errorf("container has been removed")
+	}
+
 	pod, err := k8s.GetSS(container.Label, container.Namespace)
 	if err != nil {
 		return err
@@ -248,17 +259,28 @@ func FlushInstanceConfig(cid int) error {
 		return err
 	}
 	container.ClusterIP = svc.Spec.ClusterIP
-	// container.Service = fmt.Sprintf("%v:%v", svc.Spec.ClusterIP, svc.Spec.Ports[0].Port)
-	// container.Ports = json.Marshal(svc.Spec.Ports)
+	container.Service = fmt.Sprintf("%v:%v", svc.Spec.ClusterIP, svc.Spec.Ports[0].NodePort)
 	var ports []struct {
 		TargetPort  int32 `json:"targetPort"`
 		ForwardPort int32 `json:"forwardPort"`
 	}
+
+	for _, port := range svc.Spec.Ports {
+		ports = append(ports, struct {
+			TargetPort  int32 `json:"targetPort"`
+			ForwardPort int32 `json:"forwardPort"`
+		}{
+			TargetPort:  port.TargetPort.IntVal,
+			ForwardPort: port.NodePort,
+		})
+	}
+
 	portBytes, err := json.Marshal(ports)
+	// fmt.Printf("%s", portBytes)
 	if err != nil {
 		return err
 	}
-	container.Ports = string(portBytes)
+	container.Ports = string(fmt.Sprintf("%s", portBytes))
 
 	return DB.Save(&container).Error
 }

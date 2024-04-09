@@ -12,7 +12,7 @@ import (
 )
 
 func GetSS(name string, namespace string) (*apiv1.StatefulSet, error) {
-	common.SysLog("get ss")
+	// common.SysLog("get ss, name: " + name + ", namespace: " + namespace)
 	config := GetConf()
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -29,7 +29,7 @@ func GetSS(name string, namespace string) (*apiv1.StatefulSet, error) {
 }
 
 func GetService(name string, namespace string) (*corev1.Service, error) {
-	common.SysLog("get service")
+	// common.SysLog("get service")
 	config := GetConf()
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {

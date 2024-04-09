@@ -29,13 +29,13 @@ type StorageInfo struct {
 
 func GetStorageInfo(storageID int) (StorageInfo, error) {
 	var storageInfo StorageInfo
-	result := DB.Table("storage_info").First(&storageInfo, storageID)
+	result := DB.Table("storage_infos").First(&storageInfo, storageID)
 	return storageInfo, result.Error
 }
 
 func ListBindedStorage(containerID int) ([]int, error) {
 	var storageContainerBinds []StorageContainerBind
-	result := DB.Table("storage_container_bindss").Where("container_id = ?", containerID).Find(&storageContainerBinds)
+	result := DB.Table("storage_container_binds").Where("container_id = ?", containerID).Find(&storageContainerBinds)
 	var storageIDs []int
 	for _, bind := range storageContainerBinds {
 		storageIDs = append(storageIDs, bind.StorageID)
@@ -45,7 +45,7 @@ func ListBindedStorage(containerID int) ([]int, error) {
 
 func ListAdminPVC(UserID int) ([]int, error) {
 	var pvcACLs []PVCACL
-	result := DB.Table("pvc_acl").Where("shared_user_id = ? AND permission = ?", UserID, "admin").Find(&pvcACLs)
+	result := DB.Table("pvcacls").Where("user_id = ? AND permission = ?", UserID, "admin").Find(&pvcACLs)
 	// result := DB.Where("shared_user_id = ? AND permission = ?", UserID, "admin").Find(&pvcACLs)
 	var storageIDs []int
 	for _, pvcACL := range pvcACLs {
@@ -101,7 +101,7 @@ func ListOnlyBindedPVC(userID int, containerID int) ([]StorageInfo, error) {
 
 func DeleteStorageEntries(storage StorageInfo) error {
 	tx := DB.Begin()
-	if err := tx.Table("pvc_acl").Where("storage_id = ?", storage.ID).Delete(&PVCACL{}).Error; err != nil {
+	if err := tx.Table("pvcacls").Where("storage_id = ?", storage.ID).Delete(&PVCACL{}).Error; err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to delete from PVCACL: %w", err)
 	}
@@ -109,6 +109,11 @@ func DeleteStorageEntries(storage StorageInfo) error {
 	if err := tx.Table("storage_container_binds").Where("storage_id = ?", storage.ID).Delete(&StorageContainerBind{}).Error; err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to delete from StorageContainerBind: %w", err)
+	}
+
+	if err := tx.Table("storage_infos").Where("id = ?", storage.ID).Delete(&StorageInfo{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete from StorageInfo: %w", err)
 	}
 
 	if err := k8s.RemovePVC(storage.PVCName); err != nil {
