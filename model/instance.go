@@ -38,6 +38,11 @@ type ContainerConfig struct {
 	Price       float64 `gorm:"type:float" json:"price"`
 }
 
+type PortMapping struct {
+	TargetPort  int `json:"targetPort"`
+	ForwardPort int `json:"forwardPort"`
+}
+
 func GetUserContainerByID(id int) (*UserContainer, error) {
 	var container UserContainer
 	err := DB.First(&container, id).Error
@@ -238,12 +243,25 @@ func GetGuacdInfo(basearg guac.ReqArgBaseInfo, uid int) (guac.ReqArg, error) {
 	reqarg := new(guac.ReqArg)
 	reqarg.AssetUser = basearg.AssetUser
 	reqarg.AssetPassword = basearg.AssetPassword
-	// get rdp port from db
 	var container UserContainer
 	if err := DB.Where("id = ?", basearg.InstanceID).First(&container).Error; err != nil {
 		return *reqarg, err
 	}
-	// reqarg.AssetPort = fmt.Sprint(container.RDPport)
+
+	// Deserialize the Ports field into a slice of PortMapping
+	var portMappings []PortMapping
+	if err := json.Unmarshal([]byte(container.Ports), &portMappings); err != nil {
+		return *reqarg, err
+	}
+
+	// Search for the port mapping where TargetPort is 3389
+	for _, pm := range portMappings {
+		if pm.TargetPort == 3389 {
+			reqarg.AssetPort = fmt.Sprint(pm.ForwardPort)
+			break
+		}
+	}
+
 	reqarg.AssetHost = "172.16.13.73"
 	reqarg.AssetProtocol = "rdp"
 	reqarg.GuacadAddr = os.Getenv("GUACD_URL")
