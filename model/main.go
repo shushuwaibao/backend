@@ -3,6 +3,7 @@ package model
 import (
 	"gin-template/common"
 	"os"
+	"time"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
@@ -81,7 +82,7 @@ func InitDB() (err error) {
 		if err != nil {
 			return err
 		}
-		err = db.AutoMigrate(&UserPVCShare{})
+		err = db.AutoMigrate(&PVCACL{})
 		if err != nil {
 			return err
 		}
@@ -108,4 +109,15 @@ func CloseDB() error {
 	}
 	err = sqlDB.Close()
 	return err
+}
+
+func Watch() {
+	for true {
+		var ids []int
+		DB.Table("user_containers").Select("id").Find(&ids)
+		for _, id := range ids {
+			FlushInstanceConfig(id)
+		}
+		time.Sleep(1 * time.Second)
+	}
 }

@@ -37,6 +37,8 @@ func main() {
 		}
 	}()
 
+	go model.Watch()
+
 	// Initialize Redis
 	err = common.InitRedisClient()
 	if err != nil {
