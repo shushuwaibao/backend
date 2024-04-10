@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"gin-template/common"
 	"gin-template/model"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 func GetAllFiles(c *gin.Context) {
@@ -157,4 +158,13 @@ func DownloadFile(c *gin.Context) {
 	go func() {
 		model.UpdateDownloadCounter(path)
 	}()
+}
+
+func GetAvailableArchiveHandler(c *gin.Context) {
+	imageConfigs, err := model.GetAvailableArchive()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		return
+	}
+	c.JSON(http.StatusOK, imageConfigs)
 }

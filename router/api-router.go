@@ -63,7 +63,15 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.POST("/manage", controller.ManageUser)
 				adminRoute.PUT("/", controller.UpdateUser)
 				adminRoute.DELETE("/:id", controller.DeleteUser)
+
 			}
+
+			imageRoute := userRoute.Group("/image")
+			imageRoute.Use(middleware.AdminAuth(), middleware.NoTokenAuth())
+			{
+				imageRoute.GET("/search", controller.GetAvailableArchiveHandler)
+			}
+
 		}
 		optionRoute := apiRouter.Group("/option")
 		optionRoute.Use(middleware.RootAuth(), middleware.NoTokenAuth())
