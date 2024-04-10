@@ -284,6 +284,8 @@ func FlushInstanceConfig(cid int) error {
 
 	pod, err := k8s.GetSS(container.Label, container.Namespace)
 	if err != nil {
+		updContainer(&container, "removed")
+		DB.Save(&container)
 		return err
 	}
 
@@ -296,6 +298,8 @@ func FlushInstanceConfig(cid int) error {
 
 	svc, err := k8s.GetService(container.Label, container.Namespace)
 	if err != nil {
+		updContainer(&container, "removed")
+		DB.Save(&container)
 		return err
 	}
 	container.ClusterIP = svc.Spec.ClusterIP
