@@ -67,7 +67,7 @@ func SetApiRouter(router *gin.Engine) {
 			}
 
 			imageRoute := userRoute.Group("/image")
-			imageRoute.Use(middleware.AdminAuth(), middleware.NoTokenAuth())
+			imageRoute.Use(middleware.UserAuth(), middleware.NoTokenAuth())
 			{
 				imageRoute.GET("/search", controller.GetAvailableArchiveHandler)
 			}
