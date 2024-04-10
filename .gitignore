@@ -6,3 +6,4 @@ upload
 build
 .DS_Store
 backend
+.env
