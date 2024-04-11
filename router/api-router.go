@@ -70,7 +70,7 @@ func SetApiRouter(router *gin.Engine) {
 			imageRoute.Use(middleware.UserAuth(), middleware.NoTokenAuth())
 			{
 				imageRoute.GET("/search", controller.GetAvailableArchiveHandler)
-				imageRoute.POST("/updatePermisson", controller.UpdateImagePermissionHandler)
+				imageRoute.POST("/updatePermission", controller.UpdateImagePermissionHandler)
 				imageRoute.DELETE("/deleteImage", controller.DeleteImageHandler)
 			}
 
