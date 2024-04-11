@@ -159,12 +159,3 @@ func DownloadFile(c *gin.Context) {
 		model.UpdateDownloadCounter(path)
 	}()
 }
-
-func GetAvailableArchiveHandler(c *gin.Context) {
-	imageConfigs, err := model.GetAvailableArchive()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
-		return
-	}
-	c.JSON(http.StatusOK, imageConfigs)
-}
