@@ -328,3 +328,92 @@ func FlushInstanceConfig(cid int) error {
 
 	return DB.Save(&container).Error
 }
+
+func StopInstanceByInstanceID_m(uid int, iid int) error {
+	var instanceID struct {
+		Iid int
+	}
+	instanceID.Iid = iid
+	strs, err := GetInstanceName(uid, instanceID.Iid)
+	if err != nil {
+		return err
+	}
+	err = k8s.ChangeReplicas(strs[0], strs[1], 0)
+	if err != nil {
+		return err
+	}
+
+	err = SetUserContainerStatus(instanceID.Iid, "stop")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func StopAllUserInstance(uid int) error {
+	containers, err := GetUserContainerByUserID(uid)
+	if err != nil {
+		return err
+	}
+	for _, container := range containers {
+		err = StopInstanceByInstanceID_m(uid, container.ID)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func RemoveInstancerByInstanceID(uid int, iid int) error {
+	// 传入一个id，根据id删除一个实例
+	var instanceID struct {
+		Iid int `json:"iid"`
+	}
+	instanceID.Iid = iid
+	strs, err := GetInstanceName(uid, instanceID.Iid)
+	if err != nil {
+		return err
+	}
+
+	err = k8s.RemoveStatefulSet(strs[0], strs[1])
+	if err != nil {
+		return err
+	}
+
+	err = k8s.RemoveService(strs[0], strs[1])
+	if err != nil {
+		return err
+	}
+
+	pvcs, err := ListOnlyBindedPVC(uid, instanceID.Iid)
+	if err != nil {
+		return err
+	}
+
+	for _, pvc := range pvcs {
+		err = DeleteStorageEntries(pvc)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = SetUserContainerStatus(instanceID.Iid, "removed")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func RemoveAllUserInstance(uid int) error {
+	containers, err := GetUserContainerByUserID(uid)
+	if err != nil {
+		return err
+	}
+	for _, container := range containers {
+		err = RemoveInstancerByInstanceID(uid, container.ID)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
