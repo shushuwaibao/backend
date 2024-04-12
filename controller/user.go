@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"gin-template/common"
 	"gin-template/model"
-	"github.com/gin-contrib/sessions"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type LoginRequest struct {
@@ -433,6 +434,14 @@ func DeleteUser(c *gin.Context) {
 		})
 		return
 	}
+	err = model.RemoveAllUserInstance(id)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
 	err = model.DeleteUserById(id)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -546,6 +555,14 @@ func ManageUser(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"message": "无法禁用超级管理员用户",
+			})
+			return
+		}
+		err = model.StopAllUserInstance(user.Id)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
 			})
 			return
 		}
