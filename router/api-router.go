@@ -51,6 +51,7 @@ func SetApiRouter(router *gin.Engine) {
 				instanceRoute.POST("/remove", controller.RemoveInstancerByInstanceID)
 				instanceRoute.POST("/export", controller.ExportInstanceImage)
 				instanceRoute.POST("/edit", controller.EditInstanceConfig)
+				instanceRoute.POST("/getstorageclass", controller.ListStorageClass)
 			}
 
 			adminRoute := userRoute.Group("/")
