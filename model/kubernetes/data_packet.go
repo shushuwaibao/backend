@@ -27,6 +27,7 @@ type Pod struct {
 
 type Resource1 struct {
 	DefaultVolumeSize string  `json:"default_volume_size" default:"15Gi"`
+	StorageClassName  string  `json:"storage_class_name" default:"nfs-storage"`
 	ConfigID          int     `json:"config_id" binding:"required"`
 	Ports             []int32 `json:"ports" defalut:"{3398,22}"`
 }

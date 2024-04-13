@@ -217,17 +217,15 @@ func ListStorageClass(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 		return
 	}
-	bytes, err := json.Marshal(scs)
+	var names []string
+	for _, sc := range scs.Items {
+		names = append(names, sc.ObjectMeta.Name)
+	}
+	bytes, err := json.Marshal(names)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 		return
 	}
 	common.SysLog(fmt.Sprintf("%s", bytes))
-	c.JSON(http.StatusOK, bytes)
-
-	// var names []string
-	// for _, sc := range scs.Items {
-	// 	names = append(names, sc.)
-	// }
-	// c.JSON(http.StatusOK, scs)
+	c.JSON(http.StatusOK, fmt.Sprintf("%s", bytes))
 }

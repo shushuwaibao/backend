@@ -174,7 +174,7 @@ func CreateInstance(podConfig k8s.PodConfig, userid int) (int, error) {
 		Size:    podConfig.Resourses.DefaultVolumeSize,
 		// Path:         "/home/default",
 		AccessMode:   "ReadWriteOnce",
-		StorageClass: "nfs-storage",
+		StorageClass: podConfig.Resourses.StorageClassName,
 	}
 
 	// 保存StorageInfo到数据库
