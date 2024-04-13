@@ -145,4 +145,5 @@ func UpdateStorage(storage StorageInfo, size string) error {
 	if err := tx.Commit().Error; err != nil {
 		return fmt.Errorf("transaction commit failed: %w", err)
 	}
+	return nil
 }
