@@ -1,6 +1,7 @@
 package sftp
 
 import (
+	"bytes"
 	"io"
 
 	"github.com/pkg/sftp"
@@ -65,16 +66,20 @@ func downloadFile(params *FileTransferParams) (io.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	defer func() {
-		sftpClient.Close()
-		sshClient.Close()
-	}()
+	defer sshClient.Close()
+	defer sftpClient.Close()
 
 	target, err := sftpClient.Open(params.TargetPath)
 	if err != nil {
 		return nil, err
 	}
+	defer target.Close()
 
-	return target, nil
+	buf := new(bytes.Buffer)
+	_, err = buf.ReadFrom(target)
+	if err != nil {
+		return nil, err
+	}
+
+	return bytes.NewReader(buf.Bytes()), nil
 }
