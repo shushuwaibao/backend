@@ -9,44 +9,12 @@ import (
 
 func GetAvailableArchive() ([]ImageConfig, error) {
 	var results []ImageConfig
-	database, err := sqlx.Open("mysql", "root:shushuwaibao@tcp(172.16.13.73:13306)/wb2?parseTime=true")
+	// 使用已经初始化的 DB 进行查询
+	err := DB.Find(&results).Error
 	if err != nil {
-		return results, err
+		return nil, err
 	}
-	defer database.Close() // 确保在函数结束时关闭数据库连接
-
-	// 验证连接是否有效
-	err = database.Ping()
-	if err != nil {
-		log.Fatalf("ping mysql failed: %v", err)
-		return results, err
-	}
-
-	//从表中获取镜像数据
-	rows, err := database.Query("SELECT * FROM image_configs")
-	if err != nil {
-		log.Fatal(err)
-		return results, err
-	}
-	defer rows.Close()
-
-	// 遍历结果集
-	for rows.Next() {
-		var data ImageConfig
-		err := rows.Scan(&data.ID, &data.Nickname, &data.Name, &data.Registry, &data.Version, &data.Description, &data.Size, &data.BelongsToWho, &data.BelongsTo, &data.Permission) // ... 根据你的表结构扫描相应的列
-		if err != nil {
-			log.Fatal(err)
-			return results, err
-		}
-		results = append(results, data)
-	}
-
-	if err := rows.Err(); err != nil {
-		log.Fatal(err)
-		return results, err
-	}
-
-	return results, err
+	return results, nil
 }
 
 func DeleteImage(imageList []ImageConfig) (int, error) {
