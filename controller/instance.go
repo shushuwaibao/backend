@@ -265,7 +265,7 @@ func ListStorageClass(c *gin.Context) {
 }
 
 func GetInstanceConfig(c *gin.Context) {
-	userID, exists := c.Get("id")
+	_, exists := c.Get("id")
 	if !exists {
 		// 如果不存在，可能是因为用户未认证
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})

@@ -34,7 +34,7 @@ type Resource1 struct {
 
 type Env struct {
 	Uname    string `json:"INPUT_USER_NAME" default:"admin"`
-	Password string `json:"INPUT_USER_PSWD" default:"admin"`
+	Password string `json:"INPUT_USER_PSWD" default:"password"`
 }
 
 type PodConfig struct {
