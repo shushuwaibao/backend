@@ -127,3 +127,23 @@ func DeleteStorageEntries(storage StorageInfo) error {
 
 	return nil
 }
+
+func UpdateStorage(storage StorageInfo, size string) error {
+	tx := DB.Begin()
+
+	err := k8s.EditPVCSize(storage.PVCName, size)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to edit PVC size: %w", err)
+	}
+
+	if err := tx.Table("storage_infos").Where("id = ?", storage.ID).Update("size", size).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to update storage size: %w", err)
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return fmt.Errorf("transaction commit failed: %w", err)
+	}
+	return nil
+}
