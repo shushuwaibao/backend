@@ -10,7 +10,10 @@ import (
 func GetAvailableArchiveHandler(c *gin.Context) {
 	imageConfigs, err := model.GetAvailableArchive()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
 		return
 	}
 	c.JSON(http.StatusOK, imageConfigs)
@@ -36,7 +39,7 @@ func DeleteImageHandler(c *gin.Context) {
 		return
 	}
 
-	if result == 1 {
+	if result >= 1 {
 		// 返回成功响应
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
@@ -84,7 +87,7 @@ func UpdateImagePermissionHandler(c *gin.Context) {
 		return
 	}
 
-	if result == 1 {
+	if result >= 1 {
 		// 返回成功响应
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
@@ -96,5 +99,39 @@ func UpdateImagePermissionHandler(c *gin.Context) {
 			"message": "更新未成功执行",
 		})
 	}
+}
 
+func AddNewImageHandler(c *gin.Context) {
+	var ii model.ImageConfig // 声明ImageConfig变量以接收请求体中的数据
+
+	// 绑定请求体到ImageConfig结构体
+	if err := c.ShouldBindJSON(&ii); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "解析失败",
+		})
+		return
+	}
+
+	// 调用业务逻辑函数添加新图片
+	affectedRows, err := model.AddNewImage(&ii)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	if affectedRows >= 1 {
+		// 如果添加成功，返回成功状态及受影响的行数
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "添加成功",
+		})
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "添加未成功执行",
+		})
+	}
 }

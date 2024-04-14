@@ -73,6 +73,7 @@ func SetApiRouter(router *gin.Engine) {
 				imageRoute.GET("/search", controller.GetAvailableArchiveHandler)
 				imageRoute.POST("/updatePermission", controller.UpdateImagePermissionHandler)
 				imageRoute.DELETE("/deleteImage", controller.DeleteImageHandler)
+				imageRoute.POST("/addnewimage", controller.AddNewImageHandler)
 			}
 
 		}
