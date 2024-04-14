@@ -1,115 +1,50 @@
 package model
 
 import (
+	"errors"
 	"log"
-
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/jmoiron/sqlx"
 )
 
 func GetAvailableArchive() ([]ImageConfig, error) {
 	var results []ImageConfig
-	database, err := sqlx.Open("mysql", "root:shushuwaibao@tcp(172.16.13.73:13306)/wb2?parseTime=true")
+	// 使用已经初始化的 DB 进行查询
+	err := DB.Find(&results).Error
 	if err != nil {
-		return results, err
+		return nil, err
 	}
-	defer database.Close() // 确保在函数结束时关闭数据库连接
-
-	// 验证连接是否有效
-	err = database.Ping()
-	if err != nil {
-		log.Fatalf("ping mysql failed: %v", err)
-		return results, err
-	}
-
-	//从表中获取镜像数据
-	rows, err := database.Query("SELECT * FROM image_configs")
-	if err != nil {
-		log.Fatal(err)
-		return results, err
-	}
-	defer rows.Close()
-
-	// 遍历结果集
-	for rows.Next() {
-		var data ImageConfig
-		err := rows.Scan(&data.ID, &data.Nickname, &data.Name, &data.Registry, &data.Version, &data.Description, &data.Size, &data.BelongsToWho, &data.BelongsTo, &data.Permission) // ... 根据你的表结构扫描相应的列
-		if err != nil {
-			log.Fatal(err)
-			return results, err
-		}
-		results = append(results, data)
-	}
-
-	if err := rows.Err(); err != nil {
-		log.Fatal(err)
-		return results, err
-	}
-
-	return results, err
+	return results, nil
 }
 
-func DeleteImage(imageList []ImageConfig) (int, error) {
-	database, err := sqlx.Open("mysql", "root:shushuwaibao@tcp(172.16.13.73:13306)/wb2?parseTime=true")
-	if err != nil {
-		return 0, err
-	}
-	defer database.Close() // 确保在函数结束时关闭数据库连接
-
-	// 验证连接是否有效
-	err = database.Ping()
-	if err != nil {
-		log.Fatalf("ping mysql failed: %v", err)
-	}
-
-	// 准备DELETE语句，这里以删除某个具体ID的记录为例
-	stmt, err := database.Prepare("DELETE FROM image_configs WHERE id = ?")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmt.Close()
-
-	//删除
+func DeleteImage(imageList []ImageConfig) (int64, error) {
+	// 遍历imageList，并删除每一个ImageConfig记录
+	var deletedCount int64
 	for _, image := range imageList {
-
-		_, err = stmt.Exec(image.ID)
-		if err != nil {
-			log.Fatal(err)
+		result := DB.Delete(&image, "id = ?", image.ID)
+		if result.Error != nil {
+			return deletedCount, result.Error
 		}
+		deletedCount += result.RowsAffected
 	}
-	return 1, err
+	return deletedCount, nil
 }
 
-func UpdateImagePermission(imageList []ImageConfig, newValue []string) (int, error) {
-	database, err := sqlx.Open("mysql", "root:shushuwaibao@tcp(172.16.13.73:13306)/wb2?parseTime=true")
-	if err != nil {
-		return 0, err
-	}
-	defer database.Close() // 确保在函数结束时关闭数据库连接
-
-	// 验证连接是否有效
-	err = database.Ping()
-	if err != nil {
-		log.Fatalf("ping mysql failed: %v", err)
-		return 0, err
+func UpdateImagePermission(imageList []ImageConfig, newValue []string) (int64, error) {
+	// 确保传入的列表长度一致
+	if len(imageList) != len(newValue) {
+		return 0, errors.New("the length of imageList and newValue must be the same")
 	}
 
-	// 准备UPDATE语句，修改特定字段的值
-	stmt, err := database.Prepare("UPDATE image_configs SET permission = ? WHERE id = ?")
-	if err != nil {
-		log.Fatal(err)
-		return 0, err
-	}
-	defer stmt.Close()
-
+	// 遍历列表，更新每条记录
+	var updatedRows int64
 	for i := 0; i < len(imageList); i++ {
-		// 执行UPDATE语句
-		_, err = stmt.Exec(newValue[i], imageList[i].ID)
-		if err != nil {
-			log.Fatal(err)
-			return 0, err
+		// 使用gorm的Model结构中的ID字段作为条件更新permission字段
+		result := DB.Model(&ImageConfig{}).Where("id = ?", imageList[i].ID).Update("permission", newValue[i])
+		if result.Error != nil {
+			log.Println("Error updating image permission:", result.Error)
+			return updatedRows, result.Error
 		}
+		updatedRows += result.RowsAffected
 	}
 
-	return 1, err
+	return updatedRows, nil
 }
