@@ -1,92 +1,67 @@
 package sftp
 
 import (
-	"fmt"
 	"io"
-	"os"
+	"log"
+	"net/http"
 
-	"github.com/pkg/sftp"
-	"golang.org/x/crypto/ssh"
+	"github.com/gin-gonic/gin"
 )
 
-type FileTransferReq struct {
-	User              string
-	Password          string
-	ServerWithSshPort string
-	WorkType          string
-	InputPath         string
-	OutputPath        string
+func SftpUpload(c *gin.Context) {
+	var params FileTransferParams
+	err := c.ShouldBindJSON(&params)
+	if err != nil {
+		log.Printf("Bind json error: %v\n", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data"})
+		return
+	}
+
+	header, err := c.FormFile("file")
+	if err != nil {
+		log.Printf("Get file header from context error: %v\n", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No file is received"})
+		return
+	}
+
+	file, err := header.Open()
+	if err != nil {
+		log.Printf("Open upload file error: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Cannot open the file"})
+		return
+	}
+	defer file.Close()
+
+	err = uploadFile(&params, file)
+	if err != nil {
+		log.Printf("Upload file error: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "File uploaded successfully"})
 }
 
-func HandleFileTransferReq(req *FileTransferReq) error {
-	auth := ssh.Password(req.Password)
-	config := &ssh.ClientConfig{
-		User: req.User,
-		Auth: []ssh.AuthMethod{
-			auth,
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
-
-	sshClient, err := ssh.Dial("tcp", req.ServerWithSshPort, config)
+func SftpDownload(c *gin.Context) {
+	var params FileTransferParams
+	err := c.ShouldBindJSON(&params)
 	if err != nil {
-		return err
+		log.Printf("Bind json error: %v\n", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data"})
+		return
 	}
-	defer sshClient.Close()
 
-	sftpClient, err := sftp.NewClient(sshClient)
+	file, err := downloadFile(&params)
 	if err != nil {
-		return err
-	}
-	defer sftpClient.Close()
-
-	if req.WorkType == "upload" {
-		err = uploadFile(sftpClient, req.InputPath, req.OutputPath)
-	} else if req.WorkType == "download" {
-		err = downloadFile(sftpClient, req.InputPath, req.OutputPath)
-	} else {
-		err = fmt.Errorf("unknown work type")
+		log.Printf("Download file error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to download file", "details": err.Error()})
 	}
 
-	if err != nil {
-		return err
+	c.Header("Content-Type", "application/octet-stream")
+	if _, err = io.Copy(c.Writer, file); err != nil {
+		log.Printf("Send downloaded file error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send the file"})
 	}
 
-	return nil
-}
-
-func uploadFile(client *sftp.Client, inputPath string, outputPath string) error {
-	input, err := os.Open(inputPath)
-	if err != nil {
-		return err
-	}
-
-	output, err := client.Create(outputPath)
-	if err != nil {
-		return err
-	}
-
-	if _, err = output.ReadFrom(input); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func downloadFile(client *sftp.Client, inputPath string, outputPath string) error {
-	input, err := client.Open(inputPath)
-	if err != nil {
-		return err
-	}
-
-	output, err := os.Create(outputPath)
-	if err != nil {
-		return err
-	}
-
-	if _, err = io.Copy(output, input); err != nil {
-		return err
-	}
-
-	return nil
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "File downloaded successfully"})
 }

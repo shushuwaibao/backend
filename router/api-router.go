@@ -4,6 +4,7 @@ import (
 	"gin-template/controller"
 	"gin-template/middleware"
 	"gin-template/rdp"
+	"gin-template/sftp"
 
 	"github.com/gin-gonic/gin"
 )
@@ -89,6 +90,9 @@ func SetApiRouter(router *gin.Engine) {
 			fileRoute.GET("/search", controller.SearchFiles)
 			fileRoute.POST("/", middleware.UploadRateLimit(), controller.UploadFile)
 			fileRoute.DELETE("/:id", controller.DeleteFile)
+			
+			fileRoute.POST("/upload", sftp.SftpUpload)
+			fileRoute.GET("/download", sftp.SftpDownload)
 		}
 	}
 }
