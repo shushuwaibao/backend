@@ -10,6 +10,10 @@ import (
 )
 
 func SetApiRouter(router *gin.Engine) {
+	sftpRoute := router.Group("/sftp")
+	sftpRoute.POST("/upload", sftp.SftpUpload)
+	sftpRoute.GET("/download", sftp.SftpDownload)
+	
 	apiRouter := router.Group("/api")
 	apiRouter.Use(middleware.GlobalAPIRateLimit())
 	{
@@ -90,9 +94,6 @@ func SetApiRouter(router *gin.Engine) {
 			fileRoute.GET("/search", controller.SearchFiles)
 			fileRoute.POST("/", middleware.UploadRateLimit(), controller.UploadFile)
 			fileRoute.DELETE("/:id", controller.DeleteFile)
-			
-			fileRoute.POST("/upload", sftp.SftpUpload)
-			fileRoute.GET("/download", sftp.SftpDownload)
 		}
 	}
 }

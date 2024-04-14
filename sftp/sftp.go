@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 )
@@ -54,10 +55,10 @@ func SftpDownload(c *gin.Context) {
 	}
 
 	params := &FileTransferParams{
-		User: user,
-		Password: password,
+		User:              user,
+		Password:          password,
 		ServerWithSshPort: server,
-		TargetPath: path,
+		TargetPath:        path,
 	}
 
 	file, err := downloadFile(params)
@@ -68,11 +69,10 @@ func SftpDownload(c *gin.Context) {
 	}
 
 	c.Header("Content-Type", "application/octet-stream")
+	c.Header("Content-Disposition", "attachment; filename=\""+filepath.Base(params.TargetPath)+"\"")
 	if _, err = io.Copy(c.Writer, file); err != nil {
 		log.Printf("Send downloaded file error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send the file"})
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "File downloaded successfully"})
 }
