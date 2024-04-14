@@ -40,7 +40,7 @@ func DeleteImageHandler(c *gin.Context) {
 		// 返回成功响应
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
-			"message": "更新成功",
+			"message": "删除成功",
 		})
 	}
 }
