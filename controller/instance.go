@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"gin-template/common"
 	"gin-template/model"
@@ -208,4 +209,25 @@ func GetAllAvailableInstanceConfig(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, configs)
+}
+
+func ListStorageClass(c *gin.Context) {
+	scs, err := k8s.ListSC()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		return
+	}
+	bytes, err := json.Marshal(scs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		return
+	}
+	common.SysLog(fmt.Sprintf("%s", bytes))
+	c.JSON(http.StatusOK, bytes)
+
+	// var names []string
+	// for _, sc := range scs.Items {
+	// 	names = append(names, sc.)
+	// }
+	// c.JSON(http.StatusOK, scs)
 }

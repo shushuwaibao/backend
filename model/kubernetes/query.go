@@ -6,6 +6,7 @@ import (
 
 	apiv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	scv1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/client-go/kubernetes"
@@ -43,4 +44,14 @@ func GetService(name string, namespace string) (*corev1.Service, error) {
 	} else {
 		return svc, err
 	}
+}
+func ListSC() (*scv1.StorageClassList, error) {
+	config := GetConf()
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	scs, err := clientset.StorageV1().StorageClasses().List(context.TODO(), metav1.ListOptions{})
+	return scs, err
 }
