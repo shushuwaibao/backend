@@ -2,14 +2,16 @@ package common
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"html/template"
 	"log"
 	"net"
+	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 func OpenBrowser(url string) {
@@ -137,5 +139,14 @@ func Max(a int, b int) int {
 		return a
 	} else {
 		return b
+	}
+}
+
+func CheckEnv() {
+	envs := []string{"SQL_DSN", "IMAGE_REGISTRY", "KUBE_CONFIG", "GUACD_URL"}
+	for _, env := range envs {
+		if os.Getenv(env) == "" {
+			log.Fatalf("Environment variable %s is not set", env)
+		}
 	}
 }
