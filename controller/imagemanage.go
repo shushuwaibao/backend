@@ -39,7 +39,7 @@ func DeleteImageHandler(c *gin.Context) {
 		return
 	}
 
-	if result == 1 {
+	if result >= 1 {
 		// 返回成功响应
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
@@ -87,7 +87,7 @@ func UpdateImagePermissionHandler(c *gin.Context) {
 		return
 	}
 
-	if result == 1 {
+	if result >= 1 {
 		// 返回成功响应
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
