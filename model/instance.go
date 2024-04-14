@@ -143,7 +143,11 @@ func CreateInstance(podConfig k8s.PodConfig, userid int) (int, error) {
 	if count > 0 {
 		return -1, fmt.Errorf("label %s is not unique", podConfig.Name)
 	}
-
+	envJSON, err := json.Marshal(podConfig.Env)
+	if err != nil {
+		fmt.Println("Error marshalling Env:", err)
+		return -1, err
+	}
 	// 创建UserContainer记录
 	userContainer := UserContainer{
 		Label:     podConfig.Name,
@@ -153,9 +157,9 @@ func CreateInstance(podConfig k8s.PodConfig, userid int) (int, error) {
 		ImageID:   podConfig.ImgID,              // 假设这里是已知的或从PodConfig中提取的镜像ID
 		CreatedAt: time.Now(),
 		LastBoot:  time.Now(),
-		StartCMD:  "",     // 根据需要设置
-		Status:    "stop", // 假设新创建的容器初始状态为running
-		Envs:      "{}",   // Envs, Ports, Service等字段根据PodConfig设置
+		StartCMD:  "",              // 根据需要设置
+		Status:    "stop",          // 假设新创建的容器初始状态为running
+		Envs:      string(envJSON), // Envs, Ports, Service等字段根据PodConfig设置
 		Ports:     "{}",
 		Service:   "{}",
 		// Envs, Ports, Service等字段根据PodConfig设置
@@ -170,11 +174,10 @@ func CreateInstance(podConfig k8s.PodConfig, userid int) (int, error) {
 	// 创建StorageInfo记录
 	storageInfo := StorageInfo{
 		// ContainerID:  userContainer.ID, // 使用UserContainer的ID
-		PVCName: fmt.Sprintf("pvc-%v", podConfig.Name),
-		Size:    podConfig.Resourses.DefaultVolumeSize,
-		// Path:         "/home/default",
+		PVCName:      fmt.Sprintf("pvc-%v", podConfig.Name),
+		Size:         podConfig.Resourses.DefaultVolumeSize,
 		AccessMode:   "ReadWriteOnce",
-		StorageClass: "nfs-storage",
+		StorageClass: podConfig.Resourses.StorageClassName,
 	}
 
 	// 保存StorageInfo到数据库
@@ -196,7 +199,7 @@ func CreateInstance(podConfig k8s.PodConfig, userid int) (int, error) {
 	binding := StorageContainerBind{
 		StorageID:   storageInfo.ID,
 		ContainerID: userContainer.ID,
-		MountPath:   "/home/default",
+		MountPath:   fmt.Sprint("/home/", podConfig.Env.Uname),
 	}
 
 	if err := db.Create(&binding).Error; err != nil {
@@ -262,7 +265,7 @@ func GetGuacdInfo(basearg guac.ReqArgBaseInfo, uid int) (guac.ReqArg, error) {
 		}
 	}
 
-	reqarg.AssetHost = "172.16.13.73"
+	reqarg.AssetHost = os.Getenv("ACCESS_HOST")
 	reqarg.AssetProtocol = "rdp"
 	reqarg.GuacadAddr = os.Getenv("GUACD_URL")
 	reqarg.ScreenHeight = 1080

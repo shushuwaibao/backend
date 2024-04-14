@@ -27,8 +27,14 @@ type Pod struct {
 
 type Resource1 struct {
 	DefaultVolumeSize string  `json:"default_volume_size" default:"15Gi"`
+	StorageClassName  string  `json:"storage_class_name" default:"nfs-storage"`
 	ConfigID          int     `json:"config_id" binding:"required"`
 	Ports             []int32 `json:"ports" defalut:"{3398,22}"`
+}
+
+type Env struct {
+	Uname    string `json:"INPUT_USER_NAME" default:"admin"`
+	Password string `json:"INPUT_USER_PSWD" default:"password"`
 }
 
 type PodConfig struct {
@@ -37,5 +43,5 @@ type PodConfig struct {
 	// ImgUrl     string   `json:"img_url" default:"172.16.13.73:18443/wb/lubuntu:v1.3"`
 	ImgID     int       `json:"img_id" binding:"required"`
 	Resourses Resource1 `json:"resources"`
-	// Ports      []int32  `json:"ports" defalut:"{3398,22}"`
+	Env       Env       `json:"env"`
 }

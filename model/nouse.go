@@ -1,26 +1,31 @@
 package model
 
-// type InstanceConfig struct {
-// 	ID              int
-// 	Label           string
-// 	Namespace       string
-// 	ConfigID        string
-// 	UserID          string
-// 	ImageID         string
-// 	CreatedAt       time.Time
-// 	TotalRuntime    int
-// 	LastBoot        time.Time
-// 	StartCMD        string
-// 	Status          string
-// 	Ports           string
-// 	Envs            string
-// 	Service         string
-// 	AttachedStorage []StorageInfo // Assuming this field represents the joined data from another table.
-// 	CPUConf         string        // Assuming you might also want the config details like CPU, Memory etc.
-// 	MemoryConf      string
-// 	GPUConf         string
-// 	ImageConfig     ImageConfig // Assuming you want details about the image used.
-// }
+import (
+	"strconv"
+	"time"
+)
+
+type InstanceConfig struct {
+	ID              int
+	Label           string
+	Namespace       string
+	ConfigID        string
+	UserID          string
+	ImageID         string
+	CreatedAt       time.Time
+	TotalRuntime    int
+	LastBoot        time.Time
+	StartCMD        string
+	Status          string
+	Ports           string
+	Envs            string
+	Service         string
+	AttachedStorage []StorageInfo // Assuming this field represents the joined data from another table.
+	CPUConf         string        // Assuming you might also want the config details like CPU, Memory etc.
+	MemoryConf      string
+	GPUConf         string
+	ImageConfig     ImageConfig // Assuming you want details about the image used.
+}
 
 // func instanceConfigToPodInfo(instanceConfig *InstanceConfig) k8s.Pod {
 // 	var ret k8s.Pod
@@ -44,27 +49,57 @@ package model
 // 	return ret
 // }
 
-// func GetInstanceConfigByInstanceID(id int64) (*InstanceConfig, error) {
-// 	var instanceConfig InstanceConfig
-// 	err := DB.Table("user_containers").
-// 		Select("user_containers.*, container_configs.cpu_conf, container_configs.memory_conf, container_configs.gpu_conf, image_configs.*").
-// 		Joins("left join storage_infos on storage_infos.container_id = user_containers.id").
-// 		Joins("left join container_configs on container_configs.config_id = user_containers.config_id").
-// 		Joins("left join image_configs on image_configs.id = user_containers.image_id").
-// 		Where("user_containers.id = ?", id).
-// 		Scan(&instanceConfig).Error
+func GetInstanceConfigByInstanceID(iid int) (*InstanceConfig, error) {
+	var userContainer UserContainer
+	err := DB.Table("user_containers").Where("ID = ?", iid).First(&userContainer).Error
+	if err != nil {
+		return nil, err
+	}
 
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	// 获取配置详情，使用正确的表名 container_configs
+	var containerConfig ContainerConfig
+	err = DB.Table("container_configs").Where("config_id = ?", userContainer.ConfigID).First(&containerConfig).Error
+	if err != nil {
+		return nil, err
+	}
 
-// 	// Assuming multiple storages can be attached, find and assign them separately
-// 	var attachedStorages []StorageInfo
-// 	err = DB.Where("container_id = ?", id).Find(&attachedStorages).Error
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	instanceConfig.AttachedStorage = attachedStorages
+	// 获取存储信息，确保正确使用表名 storage_infos 和 storage_container_binds
+	var storageInfos []StorageInfo
+	err = DB.Table("storage_infos").
+		Joins("JOIN storage_container_binds ON storage_infos.id = storage_container_binds.storage_id").
+		Where("storage_container_binds.container_id = ?", iid).
+		Find(&storageInfos).Error
+	if err != nil {
+		return nil, err
+	}
 
-// 	return &instanceConfig, nil
-// }
+	// 获取图像配置，使用正确的表名 image_configs
+	var imageConfig ImageConfig
+	err = DB.Table("image_configs").Where("id = ?", userContainer.ImageID).First(&imageConfig).Error
+	if err != nil {
+		return nil, err
+	}
+	// Construct InstanceConfig.
+	instanceConfig := InstanceConfig{
+		ID:              userContainer.ID,
+		Label:           userContainer.Label,
+		Namespace:       userContainer.Namespace,
+		ConfigID:        strconv.Itoa(userContainer.ConfigID),
+		UserID:          strconv.Itoa(userContainer.UserID),
+		ImageID:         strconv.Itoa(userContainer.ImageID),
+		CreatedAt:       userContainer.CreatedAt,
+		TotalRuntime:    int(userContainer.TotalRuntime),
+		LastBoot:        userContainer.LastBoot,
+		StartCMD:        userContainer.StartCMD,
+		Status:          userContainer.Status,
+		Ports:           userContainer.Ports,
+		Envs:            userContainer.Envs,
+		Service:         userContainer.Service,
+		AttachedStorage: storageInfos,
+		CPUConf:         containerConfig.CpuConf,
+		MemoryConf:      containerConfig.MemoryConf,
+		GPUConf:         containerConfig.GpuConf,
+		ImageConfig:     imageConfig,
+	}
+	return &instanceConfig, nil
+}
