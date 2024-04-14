@@ -214,7 +214,7 @@ func EditPVCSize(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"info": "successfully removed instance"})
+	c.JSON(http.StatusOK, gin.H{"info": "successfully expand storage"})
 }
 
 func ExportInstanceImage(c *gin.Context) {
@@ -261,5 +261,30 @@ func ListStorageClass(c *gin.Context) {
 		return
 	}
 	common.SysLog(fmt.Sprintf("%s", bytes))
-	c.JSON(http.StatusOK, fmt.Sprintf("%s", bytes))
+	c.JSON(http.StatusOK, names)
+}
+
+func GetInstanceConfig(c *gin.Context) {
+	_, exists := c.Get("id")
+	if !exists {
+		// 如果不存在，可能是因为用户未认证
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	var instanceID struct {
+		Iid int `json:"iid"`
+	}
+	err := c.ShouldBindJSON(&instanceID)
+	if err != nil {
+		//没有传入iid
+		common.SysError(fmt.Sprintf("error: %v, val", err, instanceID.Iid))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	config, err := model.GetInstanceConfigByInstanceID(instanceID.Iid)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		return
+	}
+	c.JSON(http.StatusOK, config)
 }
