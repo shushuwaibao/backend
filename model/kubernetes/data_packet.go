@@ -32,12 +32,16 @@ type Resource1 struct {
 	Ports             []int32 `json:"ports" defalut:"{3398,22}"`
 }
 
+type Env struct {
+	Uname    string `json:"INPUT_USER_NAME" default:"admin"`
+	Password string `json:"INPUT_USER_PSWD" default:"admin"`
+}
+
 type PodConfig struct {
 	Name      string `json:"name" binding:"required"`
 	NameSpace string `json:"namespace" default:"default"`
 	// ImgUrl     string   `json:"img_url" default:"172.16.13.73:18443/wb/lubuntu:v1.3"`
 	ImgID     int       `json:"img_id" binding:"required"`
 	Resourses Resource1 `json:"resources"`
-	UserName  string    `json:"user_name" binding:"required"`
-	PassWord  string    `json:"pass_word" binding:"required"`
+	Env       Env       `json:"env"`
 }

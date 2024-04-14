@@ -261,5 +261,5 @@ func ListStorageClass(c *gin.Context) {
 		return
 	}
 	common.SysLog(fmt.Sprintf("%s", bytes))
-	c.JSON(http.StatusOK, fmt.Sprintf("%s", bytes))
+	c.JSON(http.StatusOK, names)
 }

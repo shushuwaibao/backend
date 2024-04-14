@@ -155,7 +155,7 @@ func CreateInstance(podConfig k8s.PodConfig, userid int) (int, error) {
 		LastBoot:  time.Now(),
 		StartCMD:  "",     // 根据需要设置
 		Status:    "stop", // 假设新创建的容器初始状态为running
-		Envs:      "{}",   // Envs, Ports, Service等字段根据PodConfig设置
+		Envs:      fmt.Sprintf("{}"),     // Envs, Ports, Service等字段根据PodConfig设置
 		Ports:     "{}",
 		Service:   "{}",
 		// Envs, Ports, Service等字段根据PodConfig设置
