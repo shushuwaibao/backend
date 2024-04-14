@@ -40,7 +40,6 @@ func SetApiRouter(router *gin.Engine) {
 			}
 
 			instanceRoute := userRoute.Group("/instance")
-			// instanceRoute.Use() //dev, no auth
 			instanceRoute.Use(middleware.UserAuth(), middleware.NoTokenAuth())
 			{
 				instanceRoute.GET("/getconfs", controller.GetAllAvailableInstanceConfig)
@@ -49,12 +48,11 @@ func SetApiRouter(router *gin.Engine) {
 				instanceRoute.POST("/start", controller.StartInstanceByInstanceID)
 				instanceRoute.POST("/stop", controller.StopInstanceByInstanceID)
 				instanceRoute.POST("/remove", controller.RemoveInstancerByInstanceID)
-				instanceRoute.POST("/export", controller.ExportInstanceImage)
 				instanceRoute.POST("/getstorageclass", controller.ListStorageClass)
 				instanceRoute.POST("/editpvc", controller.EditPVCSize)
 			}
 
-			adminRoute := userRoute.Group("/")
+			adminRoute := userRoute.Group("/admin")
 			adminRoute.Use(middleware.AdminAuth(), middleware.NoTokenAuth())
 			{
 				adminRoute.GET("/", controller.GetAllUsers)
