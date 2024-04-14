@@ -43,24 +43,35 @@ func SftpUpload(c *gin.Context) {
 }
 
 func SftpDownload(c *gin.Context) {
-	var params FileTransferParams
-	err := c.ShouldBindJSON(&params)
-	if err != nil {
-		log.Printf("Bind json error: %v\n", err)
+	user := c.Query("user")
+	password := c.Query("password")
+	server := c.Query("server_with_ssh_port")
+	path := c.Query("target_path")
+
+	if user == "" || password == "" || server == "" || path == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data"})
 		return
 	}
 
-	file, err := downloadFile(&params)
+	params := &FileTransferParams{
+		User: user,
+		Password: password,
+		ServerWithSshPort: server,
+		TargetPath: path,
+	}
+
+	file, err := downloadFile(params)
 	if err != nil {
 		log.Printf("Download file error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to download file", "details": err.Error()})
+		return
 	}
 
 	c.Header("Content-Type", "application/octet-stream")
 	if _, err = io.Copy(c.Writer, file); err != nil {
 		log.Printf("Send downloaded file error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send the file"})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "File downloaded successfully"})
