@@ -45,7 +45,7 @@ func SetApiRouter(router *gin.Engine) {
 				instanceRoute.GET("/getconfs", controller.GetAllAvailableInstanceConfig)
 				instanceRoute.POST("/create", controller.CreateInstance)
 				instanceRoute.GET("/list", controller.ListAllInstance)
-				instanceRoute.GET("/search", controller.GetInstanceConfig)
+				instanceRoute.POST("/search", controller.GetInstanceConfig)
 				instanceRoute.POST("/start", controller.StartInstanceByInstanceID)
 				instanceRoute.POST("/stop", controller.StopInstanceByInstanceID)
 				instanceRoute.POST("/remove", controller.RemoveInstancerByInstanceID)
