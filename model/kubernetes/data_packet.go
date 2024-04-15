@@ -23,6 +23,7 @@ type Pod struct {
 	ImgUrl     string   `json:"img_url" default:"172.16.13.73:18443/wb/lubuntu:v1.3"`
 	Rescourses Resource `json:"resources"`
 	Ports      []int32  `json:"ports" defalut:"{3398,22}"`
+	Env        Env      `json:"env"`
 }
 
 type Resource1 struct {

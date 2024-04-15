@@ -78,11 +78,13 @@ func CreateService(podconfig k8s.PodConfig) error {
 		pod.Rescourses.Volumes = append(pod.Rescourses.Volumes, k8s.Storage{
 			PVCName:      fmt.Sprint("pvc-", pod.Name),
 			RomLimit:     podconfig.Resourses.DefaultVolumeSize,
-			MountPath:    "/home/default",
+			MountPath:    fmt.Sprint("/home/", podconfig.Env.Uname),
 			AccessMode:   "ReadWriteOnce",
 			StorageClass: "nfs-storage",
 		})
 	}
+
+	pod.Env = podconfig.Env
 	resouse, err := GetConfigByID(podconfig.Resourses.ConfigID)
 	if err != nil {
 		return err

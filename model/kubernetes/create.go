@@ -67,6 +67,16 @@ func GetContainer(pod Pod) apiv1.Container {
 				apiv1.ResourceMemory: resource.MustParse("512Mi"),
 			},
 		},
+		Env:          []apiv1.EnvVar{
+			{
+				Name: "INPUT_USER_NAME",
+				Value: pod.Env.Uname,
+			},
+			{
+				Name: "INPUT_USER_PSWD",
+				Value: pod.Env.Password,
+			}
+		},
 		VolumeMounts: mounts,
 	}
 }
@@ -170,6 +180,7 @@ func newStatefulSetAndService(podConf Pod) (*appsv1.StatefulSet, *apiv1.Service)
 					Containers: containers,
 				},
 			},
+
 			VolumeClaimTemplates: GetPVC(podConf),
 		},
 	}
